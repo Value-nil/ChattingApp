@@ -1,2 +1,2 @@
 # ChattingApp
-A gnome chatting app
+A chatting app
