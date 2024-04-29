@@ -1,0 +1,57 @@
+Make all the GUI
+Provide interfaces for the gui, then work on the networking
+create fifo at home directory(with all conversations)
+
+message structure for daemon:
+short: can take the values of 0, 1 and 2, used to check if the message comes from the fifo, from a peer or from a udp socket, respectively
+short: the protocol to be done
+char*(11) the sending peer
+uid_t: to indicate daemon the app has been opened(NOT WITH MESSAGE SENDING)
+char*(11) the reciving peer
+char*(101) message sent
+for char*, allocate one more for null terminator
+
+make sure all of the messages are sent FROM THE BEGINING
+
+Actual to do:
+-(DONE)For processing udp message, make sure you make a new tcp socket instead of using the listening socket
+-(DONE)When listening tcp socket accepts connections, make sure to associate address to new peer(file des)
+-(DONE)Set all tcp sockets to SO_REUSEADDR (OR) Set different port for connecting/listening sockets
+-(DONE)Implement local IDs for sending targeted UDPs
+-(DONE)Check code for making sure daemon takes into account conversions between different ports
+-(DONE)Check code for placing operator delete where needed
+
+-(DONE)Check desktop app(code review)
+-(DONE)Final code review for daemon
+-(DONE)Do main app directories
+-(DONE)Reformat sending message from app
+-(DONE)Reformat processing messages on app
+-(Should be fine)Check if app handles different users on same device
+-(DONE)Implement if daemon checks for opened fifos(in case they aren't opened)
+
+-Test the app
+
+FIXING APP:
+-(DONE)Tell mainApp about new peers
+-(DONE)Fix more sockets than expected and hunged up
+-(DONE)Fix invalid pointer error when daemon closes
+-(DONE)Adapt .xml file in app
+-(DONE)Fix app not placing button on app
+-(DONE)Send current available peers when opened application
+-(DONE)Make types to replace large names(for more readability)
+-(DONE)Change addressToFd key type to non-pointer
+-(DONE)Change code to use non-pointer type in addrToFd
+-(DONE)Make 2 fifos instead of 1
+-Fix segmentation fault
+
+
+AFTER IT WORKS:
+-Implementing messages directories
+-Tell FIFO about new contacts that are requesting(not a priority)
+-Handle device leaving network(being switched off)
+-Handle someone requesting your contact
+-Create directory for .xml file
+-Handle instalation of app
+-Consider changing protocol for dedicating a number to peer leaving
+-Make function to send fifo/message on socket p2p
+-Make a debug log

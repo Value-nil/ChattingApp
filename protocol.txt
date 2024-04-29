@@ -1,0 +1,15 @@
+App to daemon:
+0: app has opened
+1: you are requesting a contact with another peer
+2: you are sending a message
+3: app is closing
+Daemon to app:
+0: someone requested your contact
+1: new message incoming
+2: new peer has entered the subnet
+3: someone accepted your request
+4: a peer has left the subnet
+Daemon to daemon tcp:
+0: a peer is requesting a contact with another peer
+1: a peer has accepted a contact from another peer
+2: new incoming message

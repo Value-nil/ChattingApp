@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <requires lib="gtk" version="4.0" />
+    <object class="GtkWindow" id="window">
+        <property name="visible">t</property>
+        <property name="maximized">t</property>
+        <property name="default-height">700</property>
+        <property name="default-width">100</property>
+        <child>
+            <object class="GtkBox" id="box">
+                <child>
+                    <object class="GtkBox">
+                        <child>
+                            <object class="GtkButton" id="chatButton">
+                                <property name="label">Create new chat</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkScrolledWindow">
+                                <child>
+                                    <object class="GtkStackSidebar">
+                                        <property name="stack">stack</property>
+                                        <property name="vexpand">t</property>
+                                    </object>
+                                </child>
+                            </object>
+                        </child>
+                        <property name="orientation">GTK_ORIENTATION_VERTICAL</property>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkStack" id="stack">
+                        <property name="hexpand">t</property>
+                        <property name="vexpand">t</property>
+                        <child>
+                            
+                        </child>
+                    </object>
+                </child>
+
+
+
+
+            </object>
+
+
+
+        </child>
+    </object>
+    <object class="GtkWindow" id="window2">
+        <child>
+            <object class="GtkBox" id="newConnectionsBox">
+                <property name="hexpand">t</property>
+                <property name="vexpand">t</property>
+
+
+            </object>
+        </child>
+
+
+    </object>
+
+
+
+
+</interface>
