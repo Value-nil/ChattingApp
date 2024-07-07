@@ -1,21 +1,23 @@
-all : mainApp daemon
+VPATH = daemonApp common desktopApp
 
-mainApp : mainApp.o fifoUtilities.o conversations.o constants.o
-	g++ fifoUtilities.o mainApp.o conversations.o constants.o `pkg-config --libs gtk4` -o mainApp
-mainApp.o : common/fifoUtilities.h desktopApp/main.cpp desktopApp/conversations.h
-	g++ desktopApp/main.cpp -c -o mainApp.o `pkg-config --cflags gtk4`
-fifoUtilities.o : common/fifoUtilities.h common/fifoUtilities.cpp
-	g++ common/fifoUtilities.cpp -c -o fifoUtilities.o
-constants.o : common/constants.cpp
-	g++ common/constants.cpp -c -o constants.o
-conversations.o : desktopApp/conversations.cpp desktopApp/conversations.h
-	g++ desktopApp/conversations.cpp -c -o conversations.o `pkg-config --cflags gtk4`
+DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o
 
-daemon : daemon.o fifoUtilities.o udp.o constants.o processMessage.o daemonApp/all.h
-	g++ daemon.o fifoUtilities.o udp.o constants.o processMessage.o -o daemon
-daemon.o : daemonApp/daemon.cpp daemonApp/all.h
-	g++ daemonApp/daemon.cpp -c -o daemon.o
-udp.o : daemonApp/udp.cpp daemonApp/udp.h
-	g++ daemonApp/udp.cpp -c -o udp.o
-processMessage.o : daemonApp/processMessage.cpp daemonApp/processMessage.h
-	g++ daemonApp/processMessage.cpp -c -o processMessage.o
+daemon: $(DAEMON_TARGETS)
+	g++ $(DAEMON_TARGETS) -o daemon
+
+cmpFuncs.o: cmpFuncs.cpp types.h
+
+daemon.o: daemon.cpp cmpFuncs.o udp.o processMessage.o daemonConstants.o socketUtils.o utilities.o constants.o
+
+daemonConstants.o: daemonConstants.cpp daemonConstants.h 
+
+processMessage.o: processMessage.cpp processMessage.h cmpFuncs.o utilities.o constants.o daemonConstants.o
+
+socketUtils.o: socketUtils.cpp socketUtils.h utilities.o daemonConstants.o
+
+udp.o: udp.cpp udp.h utilities.o cmpFuncs.o socketUtils.o daemonConstants.o
+
+utilities.o: utilities.cpp utilities.h constants.o
+
+constants.o: constants.cpp constants.h
+

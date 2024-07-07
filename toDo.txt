@@ -55,3 +55,21 @@ AFTER IT WORKS:
 -Consider changing protocol for dedicating a number to peer leaving
 -Make function to send fifo/message on socket p2p
 -Make a debug log
+
+
+
+
+BRANCH:
+Daemon:
+
+-Restructure headers
+-Setup global variables
+-Consider reformatting code
+    -Rename functions to what they do, not their cause
+(DONE)
+-Consider changing protocol for dedicating a number to peer leaving
+-Consider using structs for messages
+
+
+Main app:
+-(IMPORTANT) change gtk code(currently thread unsafe)

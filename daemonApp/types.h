@@ -1,21 +1,11 @@
-#ifndef CHATTING_APP_ALL
-#define CHATTING_APP_ALL
+#ifndef TYPES
+#define TYPES
 
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <iostream>
-#include <errno.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <vector>
-#include <sys/random.h>
-#include <new>
-#include <poll.h>
-#include <pwd.h>
 #include <map>
+#include <vector>
+#include <poll.h>
+
 
 struct cmp_str{
     bool operator()(const char* chr1, const char* chr2) const;

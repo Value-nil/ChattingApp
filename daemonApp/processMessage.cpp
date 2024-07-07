@@ -1,28 +1,50 @@
-#include "all.h"
 #include "processMessage.h"
-#include "../common/fifoUtilities.h"
+#include "../common/utilities.h"
+#include "../common/constants.h"
+#include "types.h"
+#include "daemonConstants.h"
 
-void onAppOpened(const char* id, uid_t userId, chToInt &fifos, chVec remoteIDs){
-    passwd* user = getpwuid(userId);
-    const char* fifoDir = getFifoDir(user, D_TO_A_PATH);
 
-    int fd = open(fifoDir, O_WRONLY);
-    handleError(fd);
+#include <pwd.h>
+#include <unistd.h>
+#include <new>
+#include <string.h>
+#include <vector>
+#include <map>
+#include <iostream>
+#include <fcntl.h>
 
-    fifos[id] = fd;
+extern chToInt localUsers;
+extern chVec remoteIDs;
+extern chVec requestedPeers;
+extern chToInt remoteUsers;
 
+
+void sendCurrentOnlinePeers(int localFd){
     void* message = operator new(sizeof(short) + sizeof(char)*11);
     void* toSend = message;
     *(short*)message = 2;
     message = (short*)message + 1;
-
+    
     for(int i = 0; i < remoteIDs.size(); i++){
         strcpy((char*)message, remoteIDs[i]);
-        int success = write(fd, toSend, sizeof(short) + sizeof(char)*11);
+        int success = write(localFd, toSend, sizeof(short) + sizeof(char)*11);
         handleError(success);
     }
-
     operator delete(toSend);
+}
+
+
+void initializeUser(const char* id, uid_t userId){
+    passwd* user = getpwuid(userId);
+    const char* fifoDir = getFifoPath(user, D_TO_A_PATH);
+
+    int localFd = open(fifoDir, O_WRONLY);
+    handleError(localFd);
+
+    localUsers[id] = localFd;
+
+    sendCurrentOnlinePeers(localFd);
 }
 
 void sendContactRequest(const char* id, const char* peerId, int fd, bool isAccepting){
@@ -43,24 +65,24 @@ void sendContactRequest(const char* id, const char* peerId, int fd, bool isAccep
     operator delete(toSend);
 }
 
-void processAcceptContact(const char* peerId, int fd){
+void processAcceptContact(const char* peerId, int localFd){
     void* message = operator new(sizeof(short)+sizeof(char)*22);
     void* toSend = message;
     *(short*)message = 3;
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
 
-    int success = write(fd, toSend, sizeof(short)+sizeof(char)*22);
+    int success = write(localFd, toSend, sizeof(short)+sizeof(char)*22);
     handleError(success);
 
     operator delete(toSend);
 }
 
-void onFifoRequestContact(const char* request, const char* id, const char* peerId, chVec &requestedPeers, int fd, int localFd){
+void checkRequestingPeers(const char* request, const char* id, const char* peerId, int remoteFd, int localFd){
     bool hasBeenRequested = false;
     for(int i = 0; i < requestedPeers.size(); i++){
         if(strcmp(request, requestedPeers[i]) == 0){
-            sendContactRequest(id, peerId, fd, true);
+            sendContactRequest(id, peerId, remoteFd, true);
             processAcceptContact(peerId, localFd);
 
             requestedPeers.erase(requestedPeers.begin()+i);
@@ -68,20 +90,29 @@ void onFifoRequestContact(const char* request, const char* id, const char* peerI
         }
     }
     if(!hasBeenRequested){
-        sendContactRequest(id, peerId, fd, false);
+        sendContactRequest(id, peerId, remoteFd, false);
     }
 
 }
 
-void onFifoMessage(void* message, int fd){
+void sendMessage(void* message, int remoteFd){
     *(short*)message = 1;
 
-    int success = write(fd, message, MAX_SIZE);
+    int success = write(remoteFd, message, MAX_SIZE);
     handleError(success);
 }
 
-//this function will be to get all the variables from the message. For actually doing somehthing, there's another function
-void processFifo(void* message, chToInt &fifos, chVec &requestedPeers, chToInt &remote, chVec remoteIDs){
+char* buildRequest(char* id, char* peerId){
+    char* request = new char[11];
+    for(int i = 0; i < 10; i++){
+        request[i] = (char)((int)(id[i])^(int)(peerId[i]));
+    }
+    request[10] = '\0';
+
+    return request;
+}
+
+void processFifo(void* message){
     short method = *(short*)message;
     message = (short*)message + 1;
 
@@ -89,45 +120,43 @@ void processFifo(void* message, chToInt &fifos, chVec &requestedPeers, chToInt &
     strcpy(id, (const char*)message);
     message = (char*)message+11;
 
-    if(method == 0){//0 for indicating app has opened
+    if(method == 0){//app has opened
         uid_t userId = *(uid_t*)message;
         
-        onAppOpened(id, userId, fifos, remoteIDs);
+        initializeUser(id, userId);
 
 
         std::cout << id << '\n';
         std::cout << *(uid_t*)message << '\n';
     }
-    else if(method == 1){//1 for requesting contact
+    else if(method == 1){//local user requesting contact
         //xor
         char* peerId = new char[11];
         strcpy(peerId, (const char*)message);
 
-        char* request = new char[11];
-        for(int i = 0; i < 10; i++){
-            request[i] = (char)((int)(id[i])^(int)(peerId[i]));
-        }
-        request[10] = '\0';
-        int fd = remote[peerId];
-        onFifoRequestContact(request, id, peerId, requestedPeers, fd, fifos[id]);
+        char* request = buildRequest(id, peerId);
+        
+        int remoteFd = remoteUsers[peerId];
+        int localFd = localUsers[id];
+        checkRequestingPeers(request, id, peerId, remoteFd, localFd);
         std::cout << "User is requesting contact!\n";
     }
-    else if(method == 2){//2 for sending message
+    else if(method == 2){//sending message
         char* peerId = new char[11];
         strcpy(peerId, (const char*)message);
 
-        int fd = remote[peerId];
+        int remoteFd = remoteUsers[peerId];
 
         message = (char*)message - 11;
         message = (short*)message - 2;
 
-        onFifoMessage(message, fd);
+        sendMessage(message, remoteFd);
         std::cout << "User is sending message!\n";
     }
     else if(method == 3){//app is being closed
-        int success = close(fifos[id]);
+        int success = close(localUsers[id]);
         handleError(success);
-        fifos[id] = 0;
+        localUsers[id] = 0;
         std::cout << "User is closing app!\n";
     }
 }
@@ -135,7 +164,7 @@ void processFifo(void* message, chToInt &fifos, chVec &requestedPeers, chToInt &
 
 
 
-void processNewIncomingM(int fd, const char* peerId, const char* actualMessage){
+void processIncomingMessage(int localFd, const char* peerId, const char* actualMessage){
     void* message = operator new(sizeof(short)+sizeof(char)*112);
     void* toSend = message;
     *(short*)message = 1;
@@ -144,14 +173,21 @@ void processNewIncomingM(int fd, const char* peerId, const char* actualMessage){
     message = (char*)message + 11;
     strcpy((char*)message, actualMessage);
 
-    int success = write(fd, toSend, sizeof(short)+sizeof(char)*112);
+    int success = write(localFd, toSend, sizeof(short)+sizeof(char)*112);
     handleError(success);
 
     operator delete(toSend);
 }
 
+void processRemoteRequest(char* id, char* peerId){
+    char* request = buildRequest(id, peerId);
+    //TELL FIFO ABOUT THIS(future)
+    requestedPeers.push_back(request);
+    std::cout << "Peer TCP is requesting contact!\n";
+}
+
 //keep in mind IDs are reversed!
-void processTcp(void* message, chVec &requestedPeers, chToInt &fifos){
+void processTcp(void* message){
     short method = *(short*)message;
     message = (short*)message + 1;
 
@@ -163,24 +199,24 @@ void processTcp(void* message, chVec &requestedPeers, chToInt &fifos){
     strcpy(id, (const char*)message);
     message = (char*)message + 11;
 
-    if(method == 0){//requestContact
-        std::cout << "Peer TCP is requesting contact!\n";
-        char* request = new char[11];
-        for(int i = 0; i < 10; i++){
-            request[i] = (char)((int)(id[i])^(int)(peerId[i]));
-        }
-        request[10] = '\0';
-        //TELL FIFO ABOUT THIS
-        requestedPeers.push_back(request);
+    if(method == 0){//peer tcp requesting contact
+        processRemoteRequest(id, peerId);
     }
-    else if(method == 1){//acceptContact
+    else if(method == 1){//peer tcp accepting contact
+        int localFd = localUsers[id];
+        if(localFd <= 0) return; // the user is offline
+        processAcceptContact(peerId, localFd);
+
         std::cout << "Peer TCP has accepted contact!\n";
-        if(fifos[id] <= 0) return;
-        processAcceptContact(peerId, fifos[id]);
     }
-    else if(method == 2){//newMessage
+    else if(method == 2){//new message incoming
+        
+        
+        const char* actualMessage = (const char*)message;
+        int localFd = localUsers[id];
+        if(localFd <= 0) return; //the user is offline
+        processIncomingMessage(localFd, peerId, actualMessage);
+
         std::cout << "New incoming message\n";
-        if(fifos[id] <= 0) return;
-        processNewIncomingM(fifos[id], peerId, (const char*)message);
     }
 }
