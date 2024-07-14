@@ -127,6 +127,8 @@ char* createInitialDir(passwd* user){
 }
 
 char* setupUserDirectory(passwd* user){
+    seteuid(user->pw_uid);
+
     char* initialDirPath = createInitialDir(user);
 
     const char* id = checkForId(initialDirPath);
@@ -134,6 +136,8 @@ char* setupUserDirectory(passwd* user){
     createMsgDir(initialDirPath);
     createFifo(initialDirPath, D_TO_A_PATH, false);
     char* fifoPath = createFifo(initialDirPath, A_TO_D_PATH, true);
+
+    seteuid(getuid());
 
     delete[] initialDirPath;
 
