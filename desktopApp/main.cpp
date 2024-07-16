@@ -13,7 +13,7 @@
 #include <mutex>
 #include <pwd.h>
 
-#include "../common/fifoUtilities.h"
+#include "../common/utilities.h"
 #include "conversations.h"
 
 GtkBox* newConnectionsBox;
@@ -238,7 +238,7 @@ void sendFifoOpened(const char* id){
     int success = write(writingFifo, toSend, sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
     handleError(success);
 }
-const char* getHomeDir(){
+const char* getHomeDirPath(){
     struct passwd* user = getpwuid(getuid());
     return user->pw_dir;
 }
@@ -246,14 +246,15 @@ const char* getHomeDir(){
 const char* retrieveId(){
     char* id = new char[11];
 
-    const char* homeDir = getHomeDir();
-    char* dir = new char[sizeof(char)*(strlen(homeDir) + strlen(DIRECTORY_PATH) + strlen(ID_PATH))];
-    strcpy(dir, homeDir);
-    strcat(dir, DIRECTORY_PATH);
-    strcat(dir, ID_PATH);
+    const char* homeDirPath = getHomeDirPath();
+    char* baseDirPath = buildPath(homeDirPath, INITIAL_DIR_PATH);
+    char* idPath = buildPath(baseDirPath, ID_PATH);
+    delete[] baseDirPath;
 
-    int fd = open(dir, O_RDONLY);
+    int fd = open(idPath, O_RDONLY);
     handleError(fd);
+
+    delete[] idPath;
 
     int readSuccess = read(fd, id, sizeof(char)*11);//created by daemon, should alr come with null terminator
     handleError(readSuccess);
@@ -267,11 +268,11 @@ int main(){
     const char* id = retrieveId();
     struct passwd* user = getpwuid(getuid());
 
-    const char* readingDirectory = getFifoDir(user, D_TO_A_PATH);
-    const char* writingDirectory = getFifoDir(user, A_TO_D_PATH);
+    const char* readingFifoPath = getFifoPath(user, D_TO_A_PATH);
+    const char* writingFifoPath = getFifoPath(user, A_TO_D_PATH);
 
-    //Do user directories
-    writingFifo = open(writingDirectory, O_WRONLY | O_NONBLOCK);
+    
+    writingFifo = open(writingFifoPath, O_WRONLY | O_NONBLOCK);
     if(writingFifo == -1){
         //daemon is not active, app is useless
         std::cerr << "Daemon not found, exiting!\n";
@@ -279,7 +280,7 @@ int main(){
         return 1;
     }
     
-    int readingFifo = open(readingDirectory, O_RDONLY | O_NONBLOCK);
+    int readingFifo = open(readingFifoPath, O_RDONLY | O_NONBLOCK);
     handleError(readingFifo);
     sendFifoOpened(id);
 

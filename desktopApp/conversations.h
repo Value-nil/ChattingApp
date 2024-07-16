@@ -1,7 +1,7 @@
-#include <gtk/gtk.h>
-
 #ifndef CONVERSATION
 #define CONVERSATION
+
+#include <gtk/gtk.h>
 
 void setConversation(GtkStack* stack, GtkBox* messageBox, const char* id, const char* peerId);
 GtkFrame* newSentMessage(const char* message);

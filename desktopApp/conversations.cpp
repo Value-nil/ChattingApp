@@ -1,5 +1,6 @@
 #include "conversations.h"
 
+#include <gtk/gtk.h>
 
 
 GtkTextView* newTextView(const char* message){
