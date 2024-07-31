@@ -18,8 +18,6 @@
 
 GtkBox* newConnectionsBox;
 GtkStack* conversations;
-std::mutex newConnectionsBoxMutex;
-std::mutex conversationsMutex;
 int writingFifo;
 
 
@@ -54,6 +52,7 @@ void connectionClicked(GtkButton* self, gpointer data){
 
     void* toWrite = operator new(sizeof(short)*2+sizeof(char)*22);
     void* message = toWrite;
+    
     *(short*)toWrite = 0;
     toWrite = (short*)toWrite+1;
     *(short*)toWrite = 1;
@@ -70,39 +69,24 @@ void connectionClicked(GtkButton* self, gpointer data){
 
 
 
-//solve data gpointer
-void mainWindow(GtkApplication* self, gpointer data){
+GtkWindow* startGtk(){
+    gtk_init();
+
     GtkBuilder* builder = gtk_builder_new_from_file(XML_GUI_FILE);
     GtkWindow* window = GTK_WINDOW(gtk_builder_get_object(builder, "window"));
     
-
     GtkStack* stack = (GtkStack*)gtk_builder_get_object(builder, "stack");
     conversations = stack;
 
-    GtkButton* chatButton = (GtkButton*)gtk_builder_get_object(builder, "chatButton");
+    GtkButton* newChatButton = (GtkButton*)gtk_builder_get_object(builder, "chatButton");
     GtkWindow* window2 = GTK_WINDOW(gtk_builder_get_object(builder, "window2"));
-    g_signal_connect(window2, "close-request", (GCallback)closeMainRequest, window2);
 
-    
+    g_signal_connect(window, "close-request", (GCallback)closeMainRequest, window2);    
+    g_signal_connect(newChatButton, "clicked", (GCallback)clicked, window2);
+
     newConnectionsBox = (GtkBox*)gtk_builder_get_object(builder, "newConnectionsBox");
-    g_signal_connect(chatButton, "clicked", (GCallback)clicked, window2);
 
-
-
-    gtk_window_set_application(window, self);
-
-    
-
-}
-
-
-
-void startGui(int pipe){
-    GtkApplication* app = gtk_application_new(NULL, G_APPLICATION_FLAGS_NONE);
-    g_signal_connect(app, "activate", (GCallback)mainWindow, NULL);
-    g_application_run((GApplication*)app, 0, nullptr);
-
-    write(pipe, "\0", sizeof("\0"));
+    return window;
 }
 
 
@@ -118,13 +102,11 @@ GtkWidget* appendNewConnection(const char* peerId, const char* id){
     gtk_widget_set_hexpand(button, true);
     g_signal_connect(button, "clicked", (GCallback)connectionClicked, (void*)id);
 
-    std::lock_guard<std::mutex> connectionMutex(newConnectionsBoxMutex);
     gtk_box_append(newConnectionsBox, button);
     return button;
 }
 
 void removeNewConnection(GtkWidget* toRemove){
-    std::lock_guard<std::mutex> connectionMutex(newConnectionsBoxMutex);
     gtk_box_remove(newConnectionsBox, toRemove);
 }
 
@@ -161,9 +143,11 @@ void processMessage(void* message, const char* id){
 
     short method = *(short*)message;
     message = (short*)message+1;
+
     char* peerId = new char[11];
     strcpy(peerId, (const char*)message);
     message = (char*)message + 11;
+
     std::cout << method << " came in!\n";
     
 
@@ -194,7 +178,6 @@ void processMessage(void* message, const char* id){
         case 3:
             //someone accepted your connection
             {
-                std::lock_guard<std::mutex> stackLock(conversationsMutex);
                 GtkBox* messageBox = newMessageBox();
                 messageBoxes[peerId] = messageBox;
 
@@ -212,7 +195,7 @@ void processMessage(void* message, const char* id){
                 removeNewConnection(newConnections[peerId]);
                 newConnections.erase(peerId);
 
-                std::lock_guard<std::mutex> stackLock(conversationsMutex);
+
                 GtkWidget* conversation = gtk_stack_get_child_by_name(conversations, peerId);
                 if(conversation != NULL){
                     gtk_stack_remove(conversations, conversation);
@@ -224,9 +207,10 @@ void processMessage(void* message, const char* id){
     }
 }
 
-void sendFifoOpened(const char* id){
+void sendOpenedMessage(const char* id){
     void* message = operator new(sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
     void* toSend = message;
+
     *(short*)message = 0;
     message = (short*)message + 1;
     *(short*)message = 0;
@@ -238,6 +222,7 @@ void sendFifoOpened(const char* id){
     int success = write(writingFifo, toSend, sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
     handleError(success);
 }
+
 const char* getHomeDirPath(){
     struct passwd* user = getpwuid(getuid());
     return user->pw_dir;
@@ -264,6 +249,58 @@ const char* retrieveId(){
     return (const char*)id;
 }
 
+gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
+    if(condition & G_IO_IN){
+        void* message = operator new(sizeof(short)+sizeof(char)*123);
+        read(fd, message, sizeof(short)+ sizeof(char)*123);
+        processMessage(message, (const char*)user_data);//user_data is the id of the user
+
+        operator delete(message);
+    }
+    else{//error
+        if(condition & (G_IO_ERR | G_IO_HUP)){
+            int closingSuccess = close(fd);
+            handleError(closingSuccess);
+        }
+        std::err << "Error on fifo fd!";
+
+        return false;
+    }
+    return true;
+}
+
+
+GSource* setupFifoSource(int readingFd, const char* id){
+    GSource* fifoSource = g_unix_fd_source_new(readingFd, G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL);
+    g_source_set_callback(fifoSource, G_SOURCE_FUNC(&fifoCallback), id, NULL);
+    
+    return fifoSource;
+}
+
+gboolean stopMainLoop(GtkWindow* self, gpointer user_data){
+    g_main_loop_quit((GMainLoop*)user_data);
+    return false;
+}
+
+void setupClosedWindowCallback(GtkWindow* window, GMainLoop* mainLoop){
+    g_signal_connect(window, "close-request", G_CALLBACK(&stopMainLoop), mainLoop);
+}
+
+
+void sendClosingMessage(const char* id){
+    void* leavingMessage = operator new(sizeof(short)*2+sizeof(char)*11);
+    void* toSend = leavingMessage;
+
+    *(short*)leavingMessage = 0;
+    leavingMessage = (short*)leavingMessage + 1;
+    *(short*)leavingMessage = 3;
+    leavingMessage = (short*)leavingMessage + 1;
+    strcpy((char*)leavingMessage, id);
+
+    int finalSuccess = write(writingFifo, toSend, sizeof(short)*2+sizeof(char)*11);
+    handleError(finalSuccess);
+}
+
 int main(){
     const char* id = retrieveId();
     struct passwd* user = getpwuid(getuid());
@@ -275,68 +312,32 @@ int main(){
     writingFifo = open(writingFifoPath, O_WRONLY | O_NONBLOCK);
     if(writingFifo == -1){
         //daemon is not active, app is useless
-        std::cerr << "Daemon not found, exiting!\n";
+        std::cerr << "Problem opening FIFO with daemon, exiting\n";
         std::cerr << errno << '\n';
         return 1;
     }
     
     int readingFifo = open(readingFifoPath, O_RDONLY | O_NONBLOCK);
     handleError(readingFifo);
-    sendFifoOpened(id);
+
+    sendOpenedMessage(id);
+
+    GSource* fifoSource = setupFifoSource(readingFifo, id);
+    GMainContext* mainContext = g_main_context_default();
+    g_source_attach(fifoSource, mainContext);
 
 
+    GtkWindow* mainWindow = startGtk();
 
-    int pipefdes[2];
-    int successPipe = pipe(pipefdes);
-    handleError(successPipe);
+    GMainLoop* mainLoop = g_main_loop_new(mainContext, false);
 
+    setupClosedWindowCallback(mainWindow, mainLoop);
 
+    std::cout << "Entering loop\n";
+    g_main_loop_run(mainLoop);
 
-    std::thread guiThread(startGui, pipefdes[1]);
-
-
-
-    //struct pollfd fileDescriptors[2];
-    std::vector<struct pollfd> fileDescriptors;
-    fileDescriptors.push_back(*newPollFd(pipefdes[0]));
-    fileDescriptors.push_back(*newPollFd(readingFifo));
-
-    sleep(5);
-    
-    while(true){
-        int success = poll(fileDescriptors.data(), 2, -1);
-        handleError(success);
-        std::cout << "Polled!\n";
-
-        if((fileDescriptors[0].revents & POLLIN) == POLLIN){
-            guiThread.join();
-            break;
-        }
-        else if((fileDescriptors[1].revents & POLLIN) == POLLIN){
-            void* message = operator new(sizeof(short)+sizeof(char)*123);
-            read(readingFifo, message, sizeof(short)+ sizeof(char)*123);
-            processMessage(message, id);
-
-            operator delete(message);
-        }
-        else{
-            std::cout << "Something unexpected has happened during polling!\n";
-            break;
-        }
-        
-    }
-    void* leavingMessage = operator new(sizeof(short)*2+sizeof(char)*11);
-    void* toSend = leavingMessage;
-    *(short*)leavingMessage = 0;
-    leavingMessage = (short*)leavingMessage + 1;
-    *(short*)leavingMessage = 3;
-    leavingMessage = (short*)leavingMessage + 1;
-    strcpy((char*)leavingMessage, id);
-
-    std::cout << *(short*)toSend;
-
-    int finalSuccess = write(writingFifo, toSend, sizeof(short)*2+sizeof(char)*11);
-    handleError(finalSuccess);
+    //this is the end of the program, since g_main_loop_run has returned
+    sendClosingMessage(id);
 
     close(readingFifo);
     close(writingFifo);

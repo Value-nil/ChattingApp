@@ -73,3 +73,5 @@ Daemon:
 
 Main app:
 -(IMPORTANT) change gtk code(currently thread unsafe)
+(DONE)
+-Reformat code
