@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <requires lib="gtk" version="4.0" />
+    <object class="GtkFrame" id="message">
+        <property name="margin-start">20</property>
+        <property name="child">
+            <object class="GtkTextView">
+                <property name="cursor-visible">0</property>
+                <property name="editable">0</property>
+                <property name="buffer">
+                    <object class="GtkTextBuffer" id="textBuffer"></object>
+                </property>
+            </object>
+        </property>
+    </object>
+</interface>

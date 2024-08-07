@@ -73,5 +73,7 @@ Daemon:
 
 Main app:
 -(IMPORTANT) change gtk code(currently thread unsafe)
-(DONE)
+-Change GUI loading from code to xml files
 -Reformat code
+(DONE)
+-When processing input text, take into account newline insertions in locations that are different from end of string

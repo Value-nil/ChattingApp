@@ -1,4 +1,6 @@
 #include <gtk/gtk.h>
+#include <glib-unix.h>
+
 #include <iostream>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -14,14 +16,16 @@
 #include <pwd.h>
 
 #include "../common/utilities.h"
-#include "conversations.h"
+#include "../common/constants.h"
 
-GtkBox* newConnectionsBox;
-GtkStack* conversations;
+GtkBox* addSubnetPeerButtons;
+GtkStack* conversationContainerStack;
 int writingFifo;
 
 
-const char* XML_GUI_FILE = "/usr/share/chattingApp/gui.xml";
+const char* XML_MAIN_GUI_FILE = "/usr/share/chattingApp/guiFiles/mainGui.xml";
+const char* XML_CONVERSATION_GUI_FILE = "/usr/share/chattingApp/guiFiles/conversationContainerGui.xml";
+const char* XML_MESSAGE_GUI_FILE = "/usr/share/chattingApp/guiFiles/message.xml";
 
 
 
@@ -35,12 +39,11 @@ bool closeSecondaryRequest(GtkWindow* self, gpointer data){
 
 bool closeMainRequest(GtkWindow* self, gpointer data){
     GtkWindow* otherWindow = (GtkWindow*)data;
-    gtk_window_close(self);
     gtk_window_close(otherWindow);
     return false;
 }
 
-void clicked(GtkButton* self, gpointer data){
+void openSecondaryWindow(GtkButton* self, gpointer data){
     GtkWindow* window2 = (GtkWindow*)data;
     gtk_widget_set_visible((GtkWidget*)window2, true);
     g_signal_connect(window2, "close-request", (GCallback)closeSecondaryRequest, NULL);
@@ -66,79 +69,149 @@ void connectionClicked(GtkButton* self, gpointer data){
     handleError(success);
 }
 
+GtkFrame* newMessage(const char* message){
+    GtkBuilder* messageBuilder = gtk_builder_new_from_file(XML_MESSAGE_GUI_FILE);
+    GtkTextBuffer* textBuffer = (GtkTextBuffer*)gtk_builder_get_object(messageBuilder, "textBuffer");
+    gtk_text_buffer_set_text(textBuffer, message, strlen(message)+1);
 
+    GtkFrame* messageFrame = (GtkFrame*)gtk_builder_get_object(messageBuilder, "message");
+    return messageFrame;
+}
+
+GtkFrame* newIncomingMessage(const char* message){
+    GtkFrame* messageFrame = newMessage(message);
+    gtk_widget_set_halign((GtkWidget*)messageFrame, GTK_ALIGN_START);
+    gtk_widget_set_margin_start((GtkWidget*)messageFrame, 20);
+
+    return messageFrame;
+}
+
+GtkFrame* newSentMessage(const char* message){
+    GtkFrame* messageFrame = newMessage(message);
+    gtk_widget_set_halign((GtkWidget*)messageFrame, GTK_ALIGN_END);
+    gtk_widget_set_margin_start((GtkWidget*)messageFrame, 20);
+
+    return messageFrame;
+}
 
 
 GtkWindow* startGtk(){
     gtk_init();
 
-    GtkBuilder* builder = gtk_builder_new_from_file(XML_GUI_FILE);
+    GtkBuilder* builder = gtk_builder_new_from_file(XML_MAIN_GUI_FILE);
     GtkWindow* window = GTK_WINDOW(gtk_builder_get_object(builder, "window"));
     
     GtkStack* stack = (GtkStack*)gtk_builder_get_object(builder, "stack");
-    conversations = stack;
+    conversationContainerStack = stack;
 
     GtkButton* newChatButton = (GtkButton*)gtk_builder_get_object(builder, "chatButton");
     GtkWindow* window2 = GTK_WINDOW(gtk_builder_get_object(builder, "window2"));
 
     g_signal_connect(window, "close-request", (GCallback)closeMainRequest, window2);    
-    g_signal_connect(newChatButton, "clicked", (GCallback)clicked, window2);
+    g_signal_connect(newChatButton, "clicked", (GCallback)openSecondaryWindow, window2);
 
-    newConnectionsBox = (GtkBox*)gtk_builder_get_object(builder, "newConnectionsBox");
+    addSubnetPeerButtons = (GtkBox*)gtk_builder_get_object(builder, "addSubnetPeerButtons");
 
     return window;
 }
 
 
-struct pollfd* newPollFd(int fd){
-    struct pollfd* filedes = new struct pollfd;
-    filedes->fd = fd;
-    filedes->events = POLLIN;
-    return filedes;
+GtkWidget* addNewSubnetPeer(const char* peerId, const char* id){
+    char* sendingId = new char[11];
+    strcpy(sendingId, id);
+
+    GtkWidget* addContactButton = gtk_button_new_with_label(peerId);
+    gtk_widget_set_hexpand(addContactButton, true);
+    g_signal_connect(addContactButton, "clicked", (GCallback)connectionClicked, sendingId);
+
+    gtk_box_append(addSubnetPeerButtons, addContactButton);
+    return addContactButton;
 }
 
-GtkWidget* appendNewConnection(const char* peerId, const char* id){
-    GtkWidget* button = gtk_button_new_with_label(peerId);
-    gtk_widget_set_hexpand(button, true);
-    g_signal_connect(button, "clicked", (GCallback)connectionClicked, (void*)id);
-
-    gtk_box_append(newConnectionsBox, button);
-    return button;
+void removeSubnetPeer(GtkWidget* toRemove){
+    gtk_box_remove(addSubnetPeerButtons, toRemove);
 }
 
-void removeNewConnection(GtkWidget* toRemove){
-    gtk_box_remove(newConnectionsBox, toRemove);
+char* getFullText(GtkTextBuffer* buffer){
+    GtkTextIter* start = new GtkTextIter;
+    GtkTextIter* end = new GtkTextIter;
+    gtk_text_buffer_get_bounds(buffer, start, end);
+
+    char* text = gtk_text_buffer_get_text(buffer, start, end, false);
+    char* toDelete = text;
+    text[strlen(text)-1] = '\0';
+
+    char* temp = text;
+    while(*temp == ' '){
+        temp += 1;
+    }
+    text = temp;
+
+    temp = text + strlen(text);
+    while(temp != text && *(temp-1) == ' '){
+        temp -= 1;
+    }
+    *temp = '\0';
+
+    char* processedText = new char[strlen(text)+1];
+    strcpy(processedText, text);
+
+    free(toDelete);
+
+
+    return processedText;
 }
 
 
-void insert_text (GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
+
+
+void sendMessage(const char* id, const char* peerId, const char* fullText){
+    void* message = operator new(MAX_SIZE);
+    void* toSend = message;
+
+    *(short*)message = 0;
+    message = (short*)message + 1;
+    *(short*)message = 2;
+     message = (short*)message + 1;
+    strcpy((char*)message, id);
+    message = (char*)message + 11;
+    strcpy((char*)message, peerId);
+    message = (char*)message + 11;
+    strcpy((char*)message, fullText);
+
+    write(writingFifo, toSend, MAX_SIZE);
+}
+
+void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
     if(text[0] == '\n'){
         char* fullText = getFullText(self);
-        if(fullText != "" && strlen(fullText) <= 100){
+        if(strcmp(fullText, "") && strlen(fullText) <= 100){
             gtk_text_buffer_set_text(self, "", 0);
-            void* message = operator new(MAX_SIZE);
-            void* toSend = message;
+            
             const char* id = (const char*)user_data;
             const char* peerId = (const char*)id + 11;
 
-            *(short*)message = 0;
-            message = (short*)message + 1;
-            *(short*)message = 2;
-            message = (short*)message + 1;
-            strcpy((char*)message, id);
-            message = (char*)message + 11;
-            strcpy((char*)message, peerId);
-            message = (char*)message + 11;
-            strcpy((char*)message, fullText);
-
-            write(writingFifo, toSend, MAX_SIZE);
+			sendMessage(id, peerId, fullText);
         }
     }
 }
 
 
+void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, const char* id, const char* peerId){
+    char* ids = new char[22];
+    char* toSend = ids;
+
+    strcpy(ids, id);
+    ids += 11;
+    strcpy(ids, peerId);
+
+    g_signal_connect_after(inputTextBuffer, "insert-text", (GCallback)processCharacterInserted, (void*)toSend);
+}
+
+
+
 void processMessage(void* message, const char* id){
-    static std::map<const char*, GtkWidget*> newConnections;
+    static std::map<const char*, GtkWidget*> subnetPeers; //includes non-accepted peers ONLY
     static std::map<const char*, GtkBox*> messageBoxes;
 
     short method = *(short*)message;
@@ -166,25 +239,34 @@ void processMessage(void* message, const char* id){
 
                 GtkFrame* incomingMessage = newIncomingMessage((const char*)actualMessage);
                 gtk_box_append(messageBoxes[peerId], (GtkWidget*)incomingMessage);
+
                 break;
             }
             
         case 2:
             //new device on subnet
             {
-                newConnections[peerId] = appendNewConnection(peerId, id);
+                subnetPeers[peerId] = addNewSubnetPeer(peerId, id);
                 break;
             }
         case 3:
             //someone accepted your connection
             {
-                GtkBox* messageBox = newMessageBox();
+                //building the conversation from xml file, making sure to setup everything
+                GtkBuilder* conversationBuilder = gtk_builder_new_from_file(XML_CONVERSATION_GUI_FILE);
+
+                GtkBox* conversationContainer = (GtkBox*)gtk_builder_get_object(conversationBuilder, "conversationContainer");
+                gtk_stack_add_titled(conversationContainerStack, (GtkWidget*)conversationContainer, peerId, peerId);
+
+                GtkBox* messageBox = (GtkBox*)gtk_builder_get_object(conversationBuilder, "messageBox");
                 messageBoxes[peerId] = messageBox;
 
-                setConversation(conversations, messageBox, id, peerId);
+                GtkTextBuffer* inputTextBuffer = (GtkTextBuffer*)gtk_builder_get_object(conversationBuilder, "inputTextBuffer");
+                setupInsertTextCallback(inputTextBuffer, id, peerId);
 
-                removeNewConnection(newConnections[peerId]);
-                newConnections.erase(peerId);
+
+                removeSubnetPeer(subnetPeers[peerId]);
+                subnetPeers.erase(peerId);
 
                 break;
             }
@@ -192,13 +274,13 @@ void processMessage(void* message, const char* id){
         case 4:
             //left device
             {
-                removeNewConnection(newConnections[peerId]);
-                newConnections.erase(peerId);
+                removeSubnetPeer(subnetPeers[peerId]);
+                subnetPeers.erase(peerId);
 
 
-                GtkWidget* conversation = gtk_stack_get_child_by_name(conversations, peerId);
-                if(conversation != NULL){
-                    gtk_stack_remove(conversations, conversation);
+                GtkWidget* conversationContainer = gtk_stack_get_child_by_name(conversationContainerStack, peerId);
+                if(conversationContainer != NULL){
+                    gtk_stack_remove(conversationContainerStack, conversationContainer);
                 }
 
                 messageBoxes[peerId] = nullptr;
@@ -262,7 +344,7 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
             int closingSuccess = close(fd);
             handleError(closingSuccess);
         }
-        std::err << "Error on fifo fd!";
+        std::cerr << "Error on fifo fd!";
 
         return false;
     }
@@ -271,8 +353,11 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
 
 
 GSource* setupFifoSource(int readingFd, const char* id){
-    GSource* fifoSource = g_unix_fd_source_new(readingFd, G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL);
-    g_source_set_callback(fifoSource, G_SOURCE_FUNC(&fifoCallback), id, NULL);
+    char* sendingId = new char[11];
+    strcpy(sendingId, id);
+
+    GSource* fifoSource = g_unix_fd_source_new(readingFd, (GIOCondition)(G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL));
+    g_source_set_callback(fifoSource, G_SOURCE_FUNC(&fifoCallback), sendingId, NULL);
     
     return fifoSource;
 }

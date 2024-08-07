@@ -1,6 +1,9 @@
 VPATH = daemonApp common desktopApp
 
 DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o
+MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o
+
+all: daemon mainApp
 
 daemon: $(DAEMON_TARGETS)
 	g++ $(DAEMON_TARGETS) -o daemon
@@ -21,3 +24,9 @@ utilities.o: utilities.cpp utilities.h constants.o
 
 constants.o: constants.cpp constants.h
 
+
+mainApp: $(MAIN_APP_TARGETS)
+	g++ $(MAIN_APP_TARGETS) -o mainApp `pkg-config --libs gtk4`
+
+mainApp.o: main.cpp
+	g++ -c -o mainApp.o desktopApp/main.cpp `pkg-config --cflags gtk4`

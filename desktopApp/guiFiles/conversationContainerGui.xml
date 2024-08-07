@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+	<requires lib="gtk" version "4.0" />
+	<object class="GtkBox" id="conversationContainer">
+		<property name="orientation">1</property>
+		<property name="spacing">0</property>
+		<child>
+			<object class="GtkScrolledWindow">
+				<property name="child">
+					<object class="GtkBox" id="messageBox">
+						<property name="orientation">1</property>
+						<property name="spacing">10</property>
+					</object>
+				</property>
+			</object>
+		</child>
+		<child>
+			<object class="GtkFrame">
+				<property name="valign">2</property>
+				<property name="child">
+					<object class="GtkScrolledWindow">
+						<property name="vexpand">TRUE</property>
+						<property name="valign">3</property>
+						<property name="child">
+							<object class="GtkTextView">
+								<property name="margin-start">3</property>
+								<property name="margin-end">3</property>
+								<property name="margin-bottom">3</property>
+								<property name="wrap-mode">3</property>
+								<property name="buffer">
+									<object class="GtkTextBuffer" id="inputTextBuffer">
+										<property name="enable-undo">FALSE</property>
+									</object>
+								</property>
+							</object>
+						</property>
+					</object>
+				</property>
+			</object>
+		</child>
+	</object> 
+</interface>

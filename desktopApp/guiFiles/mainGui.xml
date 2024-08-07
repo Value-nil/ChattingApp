@@ -32,35 +32,17 @@
                     <object class="GtkStack" id="stack">
                         <property name="hexpand">t</property>
                         <property name="vexpand">t</property>
-                        <child>
-                            
-                        </child>
                     </object>
                 </child>
-
-
-
-
             </object>
-
-
-
         </child>
     </object>
     <object class="GtkWindow" id="window2">
         <child>
-            <object class="GtkBox" id="newConnectionsBox">
+            <object class="GtkBox" id="addSubnetPeerButtons">
                 <property name="hexpand">t</property>
                 <property name="vexpand">t</property>
-
-
             </object>
         </child>
-
-
     </object>
-
-
-
-
 </interface>
