@@ -67,6 +67,8 @@ void connectionClicked(GtkButton* self, gpointer data){
 
     int success = write(writingFifo, message, sizeof(short)*2+sizeof(char)*22);
     handleError(success);
+
+    operator delete(message);
 }
 
 GtkFrame* newMessage(const char* message){
@@ -180,6 +182,8 @@ void sendMessage(const char* id, const char* peerId, const char* fullText){
     strcpy((char*)message, fullText);
 
     write(writingFifo, toSend, MAX_SIZE);
+
+    operator delete(toSend);
 }
 
 void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
@@ -311,6 +315,8 @@ void sendOpenedMessage(const char* id){
 
     int success = write(writingFifo, toSend, sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
     handleError(success);
+
+    operator delete(toSend);
 }
 
 const char* getHomeDirPath(){
@@ -392,6 +398,8 @@ void sendClosingMessage(const char* id){
 
     int finalSuccess = write(writingFifo, toSend, sizeof(short)*2+sizeof(char)*11);
     handleError(finalSuccess);
+
+    operator delete(toSend);
 }
 
 int main(){

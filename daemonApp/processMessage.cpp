@@ -122,6 +122,8 @@ void sendMessage(char* id, char* peerId, char* actualMessage){
 
     int success = write(remoteFd, toSend, MAX_SIZE);
     handleError(success);
+
+    operator delete(toSend);
 }
 
 char* buildRequest(char* id, char* peerId){
