@@ -48,7 +48,7 @@ void initializeUser(const char* id, uid_t userId){
     sendCurrentOnlinePeers(localFd);
 }
 
-void sendContactRequest(const char* id, const char* peerId, int fd, bool isAccepting){
+void sendContactRequest(const char* id, const char* peerId, bool isAccepting){
     void* message = operator new(sizeof(short)*2+sizeof(char)*22);
     void* toSend = message;
 
@@ -60,15 +60,16 @@ void sendContactRequest(const char* id, const char* peerId, int fd, bool isAccep
     message = (char*)message + 11;
     strcpy((char*)message, peerId);
 
-    std::cout << "Sending request contact messsage to fd: " << fd << '\n';
+    int remoteFd = remoteUsers[peerId];
+    std::cout << "Sending request contact messsage to fd: " << remoteFd << '\n';
 
-    int success = write(fd, toSend, sizeof(short)*2+sizeof(char)*22);
+    int success = write(remoteFd, toSend, sizeof(short)*2+sizeof(char)*22);
     handleError(success);
 
     operator delete(toSend);
 }
 
-void processAcceptContact(const char* peerId, int localFd){
+void processAcceptContact(const char* peerId, const char* id){
     void* message = operator new(sizeof(short)+sizeof(char)*22);
     void* toSend = message;
 
@@ -78,33 +79,48 @@ void processAcceptContact(const char* peerId, int localFd){
 
     std::cout << "User accepted contact\n";
 
+    int localFd = localUsers[id];
+
     int success = write(localFd, toSend, sizeof(short)+sizeof(char)*22);
     handleError(success);
 
     operator delete(toSend);
 }
 
-void checkRequestingPeers(const char* request, const char* id, const char* peerId, int remoteFd, int localFd){
+void checkRequestingPeers(const char* request, const char* id, const char* peerId){
     bool hasBeenRequested = false;
     for(int i = 0; i < requestedPeers.size(); i++){
         if(strcmp(request, requestedPeers[i]) == 0){
-            sendContactRequest(id, peerId, remoteFd, true);
-            processAcceptContact(peerId, localFd);
+            sendContactRequest(id, peerId, true);
+            processAcceptContact(peerId, id);
 
             requestedPeers.erase(requestedPeers.begin()+i);
             hasBeenRequested = true;
         }
     }
     if(!hasBeenRequested){
-        sendContactRequest(id, peerId, remoteFd, false);
+        sendContactRequest(id, peerId, false);
     }
 
 }
 
-void sendMessage(void* message, int remoteFd){
-    *(short*)message = 1;
+void sendMessage(char* id, char* peerId, char* actualMessage){
+    void* message = operator new(MAX_SIZE);
+    void* toSend = message;
 
-    int success = write(remoteFd, message, MAX_SIZE);
+    *(short*)message = 1;
+    message = (short*)message + 1;
+    *(short*)message = 2;
+    message = (short*)message + 1;
+    strcpy((char*)message, id);
+    message = (char*) message + 11;
+    strcpy((char*)message, peerId);
+    message = (char*)message + 11;
+    strcpy((char*)message, actualMessage);
+
+    int remoteFd = remoteUsers[peerId];
+
+    int success = write(remoteFd, toSend, MAX_SIZE);
     handleError(success);
 }
 
@@ -140,22 +156,19 @@ void processFifo(void* message){
         strcpy(peerId, (const char*)message);
 
         char* request = buildRequest(id, peerId);
-        
-        int remoteFd = remoteUsers[peerId];
-        int localFd = localUsers[id];
-        checkRequestingPeers(request, id, peerId, remoteFd, localFd);
+
+        checkRequestingPeers(request, id, peerId);
         std::cout << "Local user is requesting contact with another peer\n";
     }
     else if(method == 2){//sending message
         char* peerId = new char[11];
         strcpy(peerId, (const char*)message);
+        message = (char*)message+11;
 
-        int remoteFd = remoteUsers[peerId];
+        char* actualMessage = new char[101];
+        strcpy(actualMessage, (const char*)message);
 
-        message = (char*)message - 11;
-        message = (short*)message - 2;
-
-        sendMessage(message, remoteFd);
+        sendMessage(id, peerId, actualMessage);
         std::cout << "Local user is sending message!\n";
     }
     else if(method == 3){//app is being closed
@@ -172,6 +185,7 @@ void processFifo(void* message){
 void processIncomingMessage(int localFd, const char* peerId, const char* actualMessage){
     void* message = operator new(sizeof(short)+sizeof(char)*112);
     void* toSend = message;
+
     *(short*)message = 1;
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
@@ -211,7 +225,7 @@ void processTcp(void* message){
     else if(method == 1){//peer tcp accepting contact
         int localFd = localUsers[id];
         if(localFd <= 0) return; // the user is offline
-        processAcceptContact(peerId, localFd);
+        processAcceptContact(peerId, id);
 
         std::cout << "Peer TCP has accepted contact\n";
     }

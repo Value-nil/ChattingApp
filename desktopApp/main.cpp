@@ -172,7 +172,7 @@ void sendMessage(const char* id, const char* peerId, const char* fullText){
     *(short*)message = 0;
     message = (short*)message + 1;
     *(short*)message = 2;
-     message = (short*)message + 1;
+    message = (short*)message + 1;
     strcpy((char*)message, id);
     message = (char*)message + 11;
     strcpy((char*)message, peerId);

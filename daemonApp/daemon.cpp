@@ -158,7 +158,7 @@ int processUser(passwd* user, int udpFd, bool isFirstMessage){
     return fifoFd;
 }
 
-//as I need to retrieve the sending address, I need to translate it to use recvmsg() instead of read()
+//as I need to retrieve the sending address, I need to translate it to use recvfrom() instead of read()
 void translateUdp(){
     sockaddr_in* address = new sockaddr_in;
     socklen_t* size = new socklen_t;
@@ -189,7 +189,7 @@ void translateListeningTcp(){
     handleError(newConnection.fd);
                     
     toRead.push_back(newConnection);
-    addressToFd[*newPeer] = newConnection.fd;//for other users a device might have
+    addressToFd[newPeer->sin_addr] = newConnection.fd;//for other users a device might have
 
     cout << "Accepted new TCP socket: " << newConnection.fd;
 }

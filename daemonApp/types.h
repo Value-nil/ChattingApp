@@ -12,13 +12,13 @@ struct cmp_str{
 };
 
 struct cmp_addr{
-    bool operator()(const sockaddr_in addr1, const sockaddr_in addr2) const;
+    bool operator()(const in_addr addr1, const in_addr addr2) const;
 };
 
 typedef std::map<const char*, int, cmp_str> chToInt;
 typedef std::vector<const char*> chVec;
 typedef std::vector<pollfd> pollVec;
-typedef std::map<sockaddr_in, int, cmp_addr> addrToFd;
+typedef std::map<in_addr, int, cmp_addr> addrToFd;
 
 
 

@@ -62,8 +62,6 @@ void sendLocalContacts(int udpSock, sockaddr_in* address){
     *(bool*)message = false;
     message = (bool*)message + 1;
     
-    address->sin_port = htons(SENDING_PORT);
-    
     int success1 = connect(udpSock, (sockaddr*)address, sizeof(sockaddr_in));
     handleError(success1);
     
@@ -73,7 +71,6 @@ void sendLocalContacts(int udpSock, sockaddr_in* address){
         int writingSuccess = write(udpSock, toSend, SIZE_MULTICAST);
         handleError(writingSuccess);
     }
-    address->sin_port = htons(LISTENING_PORT);
 
     resetPeer(udpSock);
 
@@ -103,15 +100,21 @@ void sendNewContactToLocals(const char* peerId){
     operator delete(toSend);
 }
 
+void connectToPeerListeningTcp(int fd, sockaddr_in* address){
+    address->sin_port = htons(LISTENING_PORT); // connect to the listening socket of the peer
+
+    int success = connect(fd, (sockaddr*)address, sizeof(sockaddr_in));
+    handleError(success);
+
+    address->sin_port = htons(SENDING_PORT); //revert port changes
+}
+
 void makeNewDeviceConnection(sockaddr_in* address, int udpSocket){
     //each device has its own socket, so a new socket is needed for every device(address)
     pollfd newtcp = newConnectingTcpSocket();
-        
-    int success = connect(newtcp.fd, (sockaddr*)address, sizeof(sockaddr_in));
-    handleError(success);
+    connectToPeerListeningTcp(newtcp.fd, address);
 
-    address->sin_port = htons(SENDING_PORT); //the recvmsg function gets the sending address, so change it to match when setting ID to fd
-    addressToFd[*address] = newtcp.fd;
+    addressToFd[address->sin_addr] = newtcp.fd;
 
     toRead.push_back(newtcp);
 
@@ -130,14 +133,13 @@ void processUdpMessage(void* message, sockaddr_in* address){
     char* peerId = new char[11];
     strcpy(peerId, (const char*)message);
 
-    address->sin_port = htons(LISTENING_PORT); // use the same address to make the tcp connection(with different port)
 
     if(isNewDevice){
         std::cout << "New device on subnet\n";
         makeNewDeviceConnection(address, udpSocket);
     }
 
-    remoteUsers[peerId] = addressToFd[*address];
+    remoteUsers[peerId] = addressToFd[address->sin_addr];
     remoteIDs.push_back(peerId);
 
     std::cout << "The fd for id " << peerId << " is: " << remoteUsers[peerId] << '\n';
