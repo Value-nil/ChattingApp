@@ -8,7 +8,7 @@
 
 #include "../common/utilities.h"
 #include "udp.h"
-#include "types.h"
+#include "daemonTypes.h"
 #include "socketUtils.h"
 #include "daemonConstants.h"
 

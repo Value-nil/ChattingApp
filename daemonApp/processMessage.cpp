@@ -1,7 +1,7 @@
 #include "processMessage.h"
 #include "../common/utilities.h"
 #include "../common/constants.h"
-#include "types.h"
+#include "daemonTypes.h"
 #include "daemonConstants.h"
 
 

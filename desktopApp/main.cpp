@@ -17,6 +17,7 @@
 
 #include "../common/utilities.h"
 #include "../common/constants.h"
+#include "desktopTypes.h"
 
 GtkBox* addSubnetPeerButtons;
 GtkStack* conversationContainerStack;
@@ -215,8 +216,8 @@ void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, const char* id, con
 
 
 void processMessage(void* message, const char* id){
-    static std::map<const char*, GtkWidget*> subnetPeers; //includes non-accepted peers ONLY
-    static std::map<const char*, GtkBox*> messageBoxes;
+    static chToWidg subnetPeers; //includes non-accepted peers ONLY
+    static chToBox messageBoxes;
 
     short method = *(short*)message;
     message = (short*)message+1;

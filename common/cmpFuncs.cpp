@@ -1,6 +1,6 @@
 #include <string.h>
 #include <netinet/in.h>
-#include "types.h"
+#include "cmpFuncs.h"
 
 
 bool cmp_str::operator()(const char* chr1, const char* chr2)const{
