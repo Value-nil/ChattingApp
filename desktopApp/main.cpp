@@ -75,7 +75,7 @@ void connectionClicked(GtkButton* self, gpointer data){
 GtkFrame* newMessage(const char* message){
     GtkBuilder* messageBuilder = gtk_builder_new_from_file(XML_MESSAGE_GUI_FILE);
     GtkTextBuffer* textBuffer = (GtkTextBuffer*)gtk_builder_get_object(messageBuilder, "textBuffer");
-    gtk_text_buffer_set_text(textBuffer, message, strlen(message)+1);
+    gtk_text_buffer_set_text(textBuffer, message, -1);
 
     GtkFrame* messageFrame = (GtkFrame*)gtk_builder_get_object(messageBuilder, "message");
     return messageFrame;

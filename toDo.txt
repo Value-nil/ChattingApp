@@ -77,3 +77,8 @@ Main app:
 -Reformat code
 (DONE)
 -When processing input text, take into account newline insertions in locations that are different from end of string
+
+
+-Fix message not displaying
+-Fix assertion error on receiving peer(DONE)
+-Fix daemon closing fifo(cannot reopen app)
