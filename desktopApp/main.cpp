@@ -240,6 +240,8 @@ void processMessage(void* message, const char* id){
                 GtkFrame* incomingMessage = newIncomingMessage((const char*)actualMessage);
                 gtk_box_append(messageBoxes[peerId], (GtkWidget*)incomingMessage);
 
+                std::cout << "New message\n";
+
                 break;
             }
             
@@ -247,6 +249,7 @@ void processMessage(void* message, const char* id){
             //new device on subnet
             {
                 subnetPeers[peerId] = addNewSubnetPeer(peerId, id);
+                std::cout << "New device on subnet\n";
                 break;
             }
         case 3:
@@ -268,6 +271,8 @@ void processMessage(void* message, const char* id){
                 removeSubnetPeer(subnetPeers[peerId]);
                 subnetPeers.erase(peerId);
 
+                std::cout << "Accepted new contact\n";
+
                 break;
             }
 
@@ -284,6 +289,9 @@ void processMessage(void* message, const char* id){
                 }
 
                 messageBoxes[peerId] = nullptr;
+
+                std::cout << "A contact has left\n";
+
                 break;
             }
     }

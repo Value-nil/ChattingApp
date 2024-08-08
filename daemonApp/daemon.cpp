@@ -191,7 +191,7 @@ void translateListeningTcp(){
     toRead.push_back(newConnection);
     addressToFd[*newPeer] = newConnection.fd;//for other users a device might have
 
-    cout << newConnection.fd << '\n';
+    cout << "Accepted new TCP socket: " << newConnection.fd;
 }
 
 
@@ -259,11 +259,7 @@ int main(){
     toRead.push_back(udpSocket);
 
 
-
     checkUsers(udpSocket);
-
-    cout << "Current size: " << toRead.size() << '\n';
-    cout << "----------------------------\n";
 
 
     //main loop of polling
@@ -273,13 +269,10 @@ int main(){
 
         cout << "Current size on polling: " << toRead.size() << '\n';
 
-        
-
-
         for(int i = 0; i < toRead.size(); i++){
             short revents = toRead[i].revents;
             if(revents != 0){
-                cout << i << " polled\n";
+                cout << toRead[i].fd << " fd polled\n";
             }
 
 

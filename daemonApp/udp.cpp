@@ -117,10 +117,11 @@ void makeNewDeviceConnection(sockaddr_in* address, int udpSocket){
 
     sendLocalContacts(udpSocket, address);
 
-    std::cout << "Is new device!\n";
+    std::cout << "New TCP socket created with fd: " << newtcp.fd << '\n';
 }
 
 void processUdpMessage(void* message, sockaddr_in* address){
+    std::cout << "New contact on subnet!\n"; 
     int udpSocket = toRead[1].fd;
 
     bool isNewDevice = *(bool*)message;
@@ -131,13 +132,15 @@ void processUdpMessage(void* message, sockaddr_in* address){
 
     address->sin_port = htons(LISTENING_PORT); // use the same address to make the tcp connection(with different port)
 
-    std::cout << "Multicast processing\n";
     if(isNewDevice){
+        std::cout << "New device on subnet\n";
         makeNewDeviceConnection(address, udpSocket);
     }
 
     remoteUsers[peerId] = addressToFd[*address];
     remoteIDs.push_back(peerId);
+
+    std::cout << "The fd for id " << peerId << " is: " << remoteUsers[peerId] << '\n';
 
     sendNewContactToLocals(peerId);
 }
