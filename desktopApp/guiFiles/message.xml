@@ -2,11 +2,18 @@
 <interface>
     <requires lib="gtk" version="4.0" />
     <object class="GtkFrame" id="message">
-        <property name="margin-start">20</property>
+        <property name="margin-start">5</property>
+        <property name="margin-end">5</property>
         <property name="child">
             <object class="GtkTextView">
                 <property name="cursor-visible">0</property>
                 <property name="editable">0</property>
+                <property name="valign">3</property>
+                <property name="margin-start">3</property>
+				<property name="margin-end">3</property>
+				<property name="margin-bottom">3</property>
+                <property name="wrap-mode">3</property>
+                <property name="height-request">20</property>
                 <property name="buffer">
                     <object class="GtkTextBuffer" id="textBuffer"></object>
                 </property>

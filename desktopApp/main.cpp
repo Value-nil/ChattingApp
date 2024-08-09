@@ -83,16 +83,14 @@ GtkFrame* newMessage(const char* message){
 
 GtkFrame* newIncomingMessage(const char* message){
     GtkFrame* messageFrame = newMessage(message);
-    gtk_widget_set_halign((GtkWidget*)messageFrame, GTK_ALIGN_START);
-    gtk_widget_set_margin_start((GtkWidget*)messageFrame, 20);
+    gtk_widget_set_margin_end((GtkWidget*)messageFrame, 30);
 
     return messageFrame;
 }
 
 GtkFrame* newSentMessage(const char* message){
     GtkFrame* messageFrame = newMessage(message);
-    gtk_widget_set_halign((GtkWidget*)messageFrame, GTK_ALIGN_END);
-    gtk_widget_set_margin_start((GtkWidget*)messageFrame, 20);
+    gtk_widget_set_margin_start((GtkWidget*)messageFrame, 30);
 
     return messageFrame;
 }

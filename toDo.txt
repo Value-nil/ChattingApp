@@ -46,6 +46,9 @@ FIXING APP:
 
 
 AFTER IT WORKS:
+-Fix daemon closing fifo(cannot reopen app)
+-When processing input text, take into account newline insertions in locations that are different from end of string
+-Change message sending to allocate memory with dynamic size
 -Implementing messages directories
 -Tell FIFO about new contacts that are requesting(not a priority)
 -Handle device leaving network(being switched off)
@@ -76,9 +79,9 @@ Main app:
 -Change GUI loading from code to xml files
 -Reformat code
 (DONE)
--When processing input text, take into account newline insertions in locations that are different from end of string
 
 
--Fix message not displaying
+-Fix message not displaying(DONE)
 -Fix assertion error on receiving peer(DONE)
--Fix daemon closing fifo(cannot reopen app)
+
+Merging and closing branch
