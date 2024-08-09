@@ -1,9 +1,11 @@
-VPATH = daemonApp common desktopApp
+VPATH = daemonApp common desktopApp desktopApp/guiFiles
 
 DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o
 MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o cmpFuncs.o
+GUI_FILES_LOCATION ::= /usr/share/chattingApp/guiFiles
+GUI_FILES_TARGETS ::= conversationContainerGui.xml mainGui.xml message.xml
 
-all: daemon mainApp
+all: daemon mainApp install
 
 daemon: $(DAEMON_TARGETS)
 	g++ $(DAEMON_TARGETS) -o daemon
@@ -30,3 +32,11 @@ mainApp: $(MAIN_APP_TARGETS)
 
 mainApp.o: main.cpp
 	g++ -c -o mainApp.o desktopApp/main.cpp `pkg-config --cflags gtk4`
+
+install: gui_files
+
+gui_files: $(patsubst %.xml,$(GUI_FILES_LOCATION)/%.xml,$(GUI_FILES_TARGETS))
+
+$(GUI_FILES_LOCATION)/%.xml: desktopApp/guiFiles/%.xml
+	mkdir -p /usr/share/chattingApp/guiFiles
+	cp $? -t /usr/share/chattingApp/guiFiles -r
