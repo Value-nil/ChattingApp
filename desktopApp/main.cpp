@@ -386,7 +386,7 @@ void setupClosedWindowCallback(GtkWindow* window, GMainLoop* mainLoop){
 
 
 void sendClosingMessage(const char* id){
-    void* leavingMessage = operator new(sizeof(short)*2+sizeof(char)*11);
+    void* leavingMessage = operator new(sizeof(short)*2+sizeof(char)*11+sizeof(uid_t));
     void* toSend = leavingMessage;
 
     *(short*)leavingMessage = 0;
@@ -394,8 +394,10 @@ void sendClosingMessage(const char* id){
     *(short*)leavingMessage = 3;
     leavingMessage = (short*)leavingMessage + 1;
     strcpy((char*)leavingMessage, id);
+    leavingMessage = (char*)leavingMessage + 11;
+    *(uid_t*)leavingMessage = getuid();
 
-    int finalSuccess = write(writingFifo, toSend, sizeof(short)*2+sizeof(char)*11);
+    int finalSuccess = write(writingFifo, toSend, sizeof(short)*2+sizeof(char)*11+sizeof(uid_t));
     handleError(finalSuccess);
 
     operator delete(toSend);
@@ -403,10 +405,9 @@ void sendClosingMessage(const char* id){
 
 int main(){
     const char* id = retrieveId();
-    struct passwd* user = getpwuid(getuid());
 
-    const char* readingFifoPath = getFifoPath(user, D_TO_A_PATH);
-    const char* writingFifoPath = getFifoPath(user, A_TO_D_PATH);
+    const char* readingFifoPath = getFifoPath(id, false);
+    const char* writingFifoPath = getFifoPath(id, true);
 
     
     writingFifo = open(writingFifoPath, O_WRONLY | O_NONBLOCK);
@@ -417,8 +418,7 @@ int main(){
         return 1;
     }
     
-    int readingFifo = open(readingFifoPath, O_RDONLY | O_NONBLOCK);
-    handleError(readingFifo);
+    int readingFifo = openFifo(readingFifoPath, O_RDONLY | O_NONBLOCK);
 
     sendOpenedMessage(id);
 

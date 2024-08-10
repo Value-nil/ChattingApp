@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <errno.h>
+#include <fcntl.h>
 
 void handleError(int returnInt){
     if(returnInt < 0){
@@ -13,12 +14,12 @@ void handleError(int returnInt){
     }
 }
 
-const char* getFifoPath(struct passwd* user, const char* fifoPath){
-    char* initialDirPath = buildPath(user->pw_dir, INITIAL_DIR_PATH);
-    char* fullFifoPath = buildPath(initialDirPath, fifoPath);
-    delete[] initialDirPath;
+const char* getFifoPath(const char* id, bool isAppToD){
+    const char* fifoIdPath = buildPath(FIFO_PATH, id);
+    const char* fullFifoPath = buildPath(fifoIdPath, isAppToD? "_r" : "_w");
+    delete[] fifoIdPath;
 
-    return (const char*)fullFifoPath;
+    return fullFifoPath;
 }
 
 char* buildPath(const char* basePath, const char* relativePath){
@@ -27,4 +28,10 @@ char* buildPath(const char* basePath, const char* relativePath){
     strcat(fullPath, relativePath);
 
     return fullPath;
+}
+
+int openFifo(const char* path, int mode){
+    int fd = open(path, mode);
+    handleError(fd);
+    return fd;
 }

@@ -1,6 +1,6 @@
 VPATH = daemonApp common desktopApp desktopApp/guiFiles
 
-DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o
+DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o fifoUtils.o
 MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o cmpFuncs.o
 GUI_FILES_LOCATION ::= /usr/share/chattingApp/guiFiles
 GUI_FILES_TARGETS ::= conversationContainerGui.xml mainGui.xml message.xml
@@ -12,11 +12,11 @@ daemon: $(DAEMON_TARGETS)
 
 cmpFuncs.o: cmpFuncs.cpp cmpFuncs.h
 
-daemon.o: daemon.cpp cmpFuncs.o udp.o processMessage.o daemonConstants.o socketUtils.o utilities.o constants.o daemonTypes.h
+daemon.o: daemon.cpp cmpFuncs.o udp.o processMessage.o daemonConstants.o socketUtils.o utilities.o constants.o daemonTypes.h fifoUtils.o
 
 daemonConstants.o: daemonConstants.cpp daemonConstants.h 
 
-processMessage.o: processMessage.cpp processMessage.h cmpFuncs.o utilities.o constants.o daemonConstants.o daemonTypes.h
+processMessage.o: processMessage.cpp processMessage.h cmpFuncs.o utilities.o constants.o daemonConstants.o daemonTypes.h fifoUtils.o
 
 socketUtils.o: socketUtils.cpp socketUtils.h utilities.o daemonConstants.o
 
@@ -25,6 +25,8 @@ udp.o: udp.cpp udp.h utilities.o cmpFuncs.o socketUtils.o daemonConstants.o daem
 utilities.o: utilities.cpp utilities.h constants.o
 
 constants.o: constants.cpp constants.h
+
+fifoUtils.o: fifoUtils.cpp fifoUtils.h daemonTypes.h utilities.o daemonConstants.o
 
 
 mainApp: $(MAIN_APP_TARGETS)

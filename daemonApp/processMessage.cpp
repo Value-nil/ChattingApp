@@ -3,6 +3,7 @@
 #include "../common/constants.h"
 #include "daemonTypes.h"
 #include "daemonConstants.h"
+#include "fifoUtils.h"
 
 
 #include <pwd.h>
@@ -37,11 +38,8 @@ void sendCurrentOnlinePeers(int localFd){
 
 
 void initializeUser(const char* id, uid_t userId){
-    passwd* user = getpwuid(userId);
-    const char* fifoDir = getFifoPath(user, D_TO_A_PATH);
-
-    int localFd = open(fifoDir, O_WRONLY);
-    handleError(localFd);
+    const char* fifoDir = getFifoPath(id, false);
+    int localFd = openFifo(fifoDir, O_WRONLY);
 
     localUsers[id] = localFd;
 
@@ -174,9 +172,13 @@ void processFifo(void* message){
         std::cout << "Local user is sending message!\n";
     }
     else if(method == 3){//app is being closed
+        uid_t userId = *(uid_t*)message;
+
         int success = close(localUsers[id]);
         handleError(success);
         localUsers[id] = 0;
+
+        restartUserFifos(id, userId);
         std::cout << "Local user is closing app!\n";
     }
 }

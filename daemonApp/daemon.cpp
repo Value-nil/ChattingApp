@@ -3,6 +3,7 @@
 #include "processMessage.h"
 #include "daemonConstants.h"
 #include "socketUtils.h"
+#include "fifoUtils.h"
 
 #include "../common/utilities.h"
 #include "../common/constants.h"
@@ -67,22 +68,13 @@ char* retrieveId(char* idPath){
     return id;
 }
 
-char* createFifo(const char* initialDirPath, const char* fifoPath, bool shouldReturn){
-    char* fullFifoPath = buildPath(initialDirPath, fifoPath);
-
-    cout << "Fifo path is: " << fullFifoPath << '\n';
-
-    int fifoSuccess = mkfifo(fullFifoPath, ACCESS_MODE);
-    if(fifoSuccess == -1 && errno != 17)
-        handleError(-1);
-
-
-    if(shouldReturn)
-        return fullFifoPath;
-    
-    delete[] fullFifoPath;
-    return nullptr;
+void createFifoDirectory(){
+    int success = mkdir(FIFO_PATH, 0777);
+    cout << "Created fifo directory on /tmp\n";
+    handleError(success);
 }
+
+
 
 char* checkForId(char* initialDirPath){
     char* idPath = buildPath(initialDirPath, ID_PATH);
@@ -126,36 +118,29 @@ char* createInitialDir(passwd* user){
     return path;
 }
 
-char* setupUserDirectory(passwd* user){
+void setupUserDirectory(passwd* user){
     seteuid(user->pw_uid);
 
     char* initialDirPath = createInitialDir(user);
 
     const char* id = checkForId(initialDirPath);
     localIDs.push_back(id);
+    createUserFifos(id, user->pw_uid);
+
     createMsgDir(initialDirPath);
-    createFifo(initialDirPath, D_TO_A_PATH, false);
-    char* fifoPath = createFifo(initialDirPath, A_TO_D_PATH, true);
 
     seteuid(getuid());
 
     delete[] initialDirPath;
-
-    return fifoPath;
 }
 
 
-int processUser(passwd* user, int udpFd, bool isFirstMessage){
+void processUser(passwd* user, int udpFd, bool isFirstMessage){
     
-    char* fifoDir = setupUserDirectory(user);
+    setupUserDirectory(user);
 
     //need to send isFirstMessage because when a peer receives just one udp message from a new peer, it will send all of its local users
     sendNewUserNotification(udpFd, *(localIDs.end()-1), isFirstMessage);
-
-    int fifoFd = open(fifoDir, O_RDONLY | O_NONBLOCK);
-    handleError(fifoFd);
-
-    return fifoFd;
 }
 
 //as I need to retrieve the sending address, I need to translate it to use recvfrom() instead of read()
@@ -200,13 +185,7 @@ void checkUsers(pollfd udpSocket){
     bool isFirstMessage = true;
     while(user != nullptr){
         if(user->pw_uid >= 1000 && user->pw_uid <= 59999){//checking for actually created users
-            int fifoFd = processUser(user, udpSocket.fd, isFirstMessage);
-
-            pollfd fifo;
-            fifo.fd = fifoFd;
-            fifo.events = POLLIN;
-
-            toRead.push_back(fifo);
+            processUser(user, udpSocket.fd, isFirstMessage);
             isFirstMessage = false;
         }
         //error handling for every user(making sure error handling is independent from every other user)
@@ -258,6 +237,8 @@ int main(){
     pollfd udpSocket = newudpSocket();
     toRead.push_back(udpSocket);
 
+
+    createFifoDirectory();
 
     checkUsers(udpSocket);
 
