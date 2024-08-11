@@ -242,7 +242,7 @@ int main(){
 
     checkUsers(udpSocket);
 
-
+    cout << std::flush;
     //main loop of polling
     while(true){
         int success = poll(toRead.data(), toRead.size(), -1);
@@ -289,6 +289,7 @@ int main(){
             }
         }
         cout << "----------------------------\n";
+        cout << std::flush;
     }
 
 

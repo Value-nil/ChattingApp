@@ -24,9 +24,9 @@ GtkStack* conversationContainerStack;
 int writingFifo;
 
 
-const char* XML_MAIN_GUI_FILE = "/usr/share/chattingApp/guiFiles/mainGui.xml";
-const char* XML_CONVERSATION_GUI_FILE = "/usr/share/chattingApp/guiFiles/conversationContainerGui.xml";
-const char* XML_MESSAGE_GUI_FILE = "/usr/share/chattingApp/guiFiles/message.xml";
+const char* XML_MAIN_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/mainGui.xml";
+const char* XML_CONVERSATION_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/conversationContainerGui.xml";
+const char* XML_MESSAGE_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/message.xml";
 
 
 

@@ -44,7 +44,7 @@ void bindSocket(int socket, bool isReceiving, bool isudp){
 
 
 pollfd newtcpSocket(bool isReceiving){
-    int sock = socket(PF_INET, SOCK_STREAM, 0);
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
     handleError(sock);
 
     bindSocket(sock, isReceiving, false);
