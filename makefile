@@ -2,7 +2,7 @@ VPATH = daemonApp common desktopApp desktopApp/guiFiles
 
 DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o fifoUtils.o
 MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o cmpFuncs.o
-GUI_FILES_LOCATION ::= /usr/share/chattingApp/guiFiles
+GUI_FILES_LOCATION ::= /usr/local/share/chattingApp/guiFiles
 GUI_FILES_TARGETS ::= conversationContainerGui.xml mainGui.xml message.xml
 
 all: chattingappd chattingApp
@@ -49,7 +49,7 @@ daemon_install: chattingappd chattingappd.service
 	mkdir /usr/local/lib/systemd/system -p
 	cp chattingappd.service /usr/local/lib/systemd/system
 	systemctl enable /usr/local/lib/systemd/system/chattingappd.service
-	systemctl start chattingappd.service
+	systemctl restart chattingappd.service
 
 main_app_install: chattingApp
 	cp chattingApp /usr/local/bin
