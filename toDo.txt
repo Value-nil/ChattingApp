@@ -47,6 +47,7 @@ FIXING APP:
 
 AFTER IT WORKS:
 -Fix daemon closing fifo(cannot reopen app)
+-Fix messages sometimes occupying all of the box space
 -When processing input text, take into account newline insertions in locations that are different from end of string
 -Change message sending to allocate memory with dynamic size
 -Implementing messages directories
@@ -57,4 +58,4 @@ AFTER IT WORKS:
 -Handle instalation of app
 -Consider changing protocol for dedicating a number to peer leaving
 -Make function to send fifo/message on socket p2p
--Make a debug log
+-Make a debug log(DONE)

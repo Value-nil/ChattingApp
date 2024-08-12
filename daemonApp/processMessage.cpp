@@ -124,10 +124,10 @@ void sendMessage(char* id, char* peerId, char* actualMessage){
     operator delete(toSend);
 }
 
-char* buildRequest(char* id, char* peerId){
+char* buildRequest(const char* id, const char* peerId){
     char* request = new char[11];
     for(int i = 0; i < 10; i++){
-        request[i] = (char)((int)(id[i])^(int)(peerId[i]));
+        request[i] = (char)((const int)(id[i])^(const int)(peerId[i]));
     }
     request[10] = '\0';
 
@@ -183,10 +183,7 @@ void processFifo(void* message){
     }
 }
 
-
-
-
-void processIncomingMessage(int localFd, const char* peerId, const char* actualMessage){
+void sendIncomingMessage(int localFd, const char* peerId, const char* actualMessage){
     void* message = operator new(sizeof(short)+sizeof(char)*112);
     void* toSend = message;
 
@@ -202,11 +199,46 @@ void processIncomingMessage(int localFd, const char* peerId, const char* actualM
     operator delete(toSend);
 }
 
-void processRemoteRequest(char* id, char* peerId){
+
+void processIncomingMessage(void* message){
+    const char* peerId = (const char*)message;
+    message = (char*)message+11;
+
+    const char* id = (const char*)message;
+    message = (char*)message + 11;
+    int localFd = localUsers[id];
+    if(localFd <= 0) return; //the user is offline
+
+    const char* actualMessage = (const char*)message;
+
+    sendIncomingMessage(localFd, peerId, actualMessage);
+}
+
+void processPeerAcceptedContact(void* message){
+    const char* peerId = (const char*)message;
+    message = (char*)message+11;
+
+    const char* id = (const char*)message;
+
+
+    int localFd = localUsers[id];
+    if(localFd <= 0) return; // the user is offline
+    processAcceptContact(peerId, id);
+
+    std::cout << "Peer TCP has accepted contact\n";
+}
+
+void processRemoteRequest(void* message){
+    const char* peerId = (const char*)message;
+    message = (char*)message+11;
+
+    const char* id = (const char*)message;
+
+
     char* request = buildRequest(id, peerId);
     //TELL FIFO ABOUT THIS(future)
     requestedPeers.push_back(request);
-    std::cout << "Peer TCP is requesting contact!\n";
+    std::cout << "Remote TCP is requesting contact!\n";
 }
 
 //keep in mind IDs are reversed!
@@ -214,33 +246,23 @@ void processTcp(void* message){
     short method = *(short*)message;
     message = (short*)message + 1;
 
-    char* peerId = new char[11];
-    strcpy(peerId, (const char*)message);
-    message = (char*)message+11;
-
-    char* id = new char[11];
-    strcpy(id, (const char*)message);
-    message = (char*)message + 11;
-
     if(method == 0){//peer tcp requesting contact
-        std::cout << "Remote TCP is requesting contact\n";
-        processRemoteRequest(id, peerId);
+        processRemoteRequest(message);
     }
     else if(method == 1){//peer tcp accepting contact
-        int localFd = localUsers[id];
-        if(localFd <= 0) return; // the user is offline
-        processAcceptContact(peerId, id);
-
-        std::cout << "Peer TCP has accepted contact\n";
+        processPeerAcceptedContact(message);
     }
     else if(method == 2){//new message incoming
-        
-        
-        const char* actualMessage = (const char*)message;
-        int localFd = localUsers[id];
-        if(localFd <= 0) return; //the user is offline
-        processIncomingMessage(localFd, peerId, actualMessage);
-
+        processIncomingMessage(message);
         std::cout << "New incoming message\n";
+    }
+    else if(method == 3){//add new contact (the device just joined)
+
+    }
+    else if(method == 4){//remove remote contact(the device is going to leave)
+
+    }
+    else if(method == 5){//the remote daemon is stopping
+
     }
 }
