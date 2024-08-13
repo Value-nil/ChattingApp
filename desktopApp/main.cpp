@@ -157,6 +157,8 @@ char* getFullText(GtkTextBuffer* buffer){
     char* processedText = new char[strlen(text)+1];
     strcpy(processedText, text);
 
+    std::cout << "Processed text: " <<  processedText << '\n';
+
     free(toDelete);
 
 
@@ -346,11 +348,19 @@ const char* retrieveId(){
 
 gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
     if(condition & G_IO_IN){
-        void* message = operator new(sizeof(short)+sizeof(char)*123);
-        read(fd, message, sizeof(short)+ sizeof(char)*123);
-        processMessage(message, (const char*)user_data);//user_data is the id of the user
+        size_t sizeOfMsg;
+        int success = read(fd, (void*)(&sizeOfMsg), sizeof(size_t));
+        if(success > 0){
+            void* message = operator new(sizeOfMsg);
+            int readingSuccess = read(fd, message, sizeOfMsg);
+            handleError(readingSuccess);
+            processMessage(message, (const char*)user_data);//user_data is the id of the user
 
-        operator delete(message);
+            operator delete(message);
+        }
+        else{
+            std::cerr << "The fifo has read with 0 bytes\n";
+        }
     }
     else{//error
         if(condition & (G_IO_ERR | G_IO_HUP)){
