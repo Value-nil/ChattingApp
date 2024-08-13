@@ -11,6 +11,7 @@
 
 
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/random.h>
 #include <sys/stat.h>
 #include <string.h>
@@ -146,17 +147,18 @@ void processUser(passwd* user, int udpFd, bool isFirstMessage){
 //as I need to retrieve the sending address, I need to translate it to use recvfrom() instead of read()
 void translateUdp(){
     sockaddr_in* address = new sockaddr_in;
-    socklen_t* size = new socklen_t;
-    *size = sizeof(sockaddr_in);
+    socklen_t size = sizeof(sockaddr_in);
 
     int udpSocket = toRead[1].fd; //second fd of polling vector is udp socket
 
     void* message = operator new(SIZE_MULTICAST);
 
-    int success = recvfrom(udpSocket, message, SIZE_MULTICAST, 0, (sockaddr*)address, size);//0 for flags
+    int success = recvfrom(udpSocket, message, SIZE_MULTICAST, 0, (sockaddr*)address, &size);//0 for flags
     handleError(success);
 
     processUdpMessage(message, address);
+
+    delete address;
     operator delete(message);
 }
 
@@ -165,11 +167,12 @@ void translateListeningTcp(){
     int listeningTcpSocket = toRead[0].fd;    //first fd of polling vector is listening tcp
 
     sockaddr_in* newPeer = new sockaddr_in;
-    socklen_t* size = new socklen_t;
-    *size = sizeof(sockaddr_in);
+    socklen_t size = sizeof(sockaddr_in);
 
-    newConnection.fd = accept(listeningTcpSocket, (sockaddr*)newPeer, size);
+    newConnection.fd = accept(listeningTcpSocket, (sockaddr*)newPeer, &size);
     newConnection.events = POLLIN;
+
+    cout << "Address of peer: " << inet_ntoa(newPeer->sin_addr) << '\n';
 
     handleError(newConnection.fd);
                     
@@ -177,6 +180,8 @@ void translateListeningTcp(){
     addressToFd[newPeer->sin_addr] = newConnection.fd;//for other users a device might have
 
     cout << "Accepted new TCP socket: " << newConnection.fd;
+
+    delete newPeer;
 }
 
 
@@ -197,35 +202,56 @@ void checkUsers(pollfd udpSocket){
     }
 }
 
-
-void processNormalPolling(int index){
-    int fd = toRead[index].fd;
-
-    void* message = operator new(MAX_SIZE);
-    int readBytes = read(fd, message, MAX_SIZE);
+void processNewData(int fd, size_t msgSize){
+    void* message = operator new(msgSize);
+    size_t readBytes = recv(fd, message, msgSize, MSG_WAITALL);
     handleError(readBytes);
 
-    if(readBytes == 0){
-        int closingSuccess = close(fd);
-        toRead.erase(toRead.begin()+index);
-
-        handleError(closingSuccess);
-
-        cout << "Peer is leaving!\n";
-    }
     if(*(short*)message == 0){
-        //fifo
         cout << "FIFO polled\n";
         processFifo((short*)message + 1);
     }
     else if(*(short*)message == 1){
         cout << "TCP polled\n";
-        //socket
         processTcp((short*)message + 1);
     }
-    cout << "Data available\n";
-                
     operator delete(message);
+}
+
+void deleteAddress(int fd){
+    sockaddr_in* leavingAddr = new sockaddr_in;
+    socklen_t size = sizeof(sockaddr_in);
+
+    int peerNameSuccess = getpeername(fd, (sockaddr*)leavingAddr, &size);
+    handleError(peerNameSuccess);
+
+    addressToFd.erase(leavingAddr->sin_addr);
+        
+    cout << "Leaving address: " << inet_ntoa(leavingAddr->sin_addr) << '\n';
+
+    delete leavingAddr;
+}
+
+
+void processNormalPolling(int index){
+    int fd = toRead[index].fd;
+
+    size_t msgSize;
+    int success = read(fd, (void*)(&msgSize), sizeof(size_t));
+    handleError(success);
+
+    if(success > 0){
+        processNewData(fd, msgSize);
+    }
+    else{
+        cout << "Peer is leaving!\n";
+
+        deleteAddress(fd);
+        
+        int closingSuccess = close(fd);
+        handleError(closingSuccess);
+        toRead.erase(toRead.begin()+index);    
+    }
 }
 
 
