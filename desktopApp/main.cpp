@@ -51,12 +51,14 @@ void openSecondaryWindow(GtkButton* self, gpointer data){
 }
 
 void connectionClicked(GtkButton* self, gpointer data){
-    
     const char* peerId = gtk_button_get_label(self);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*22;
 
-    void* toWrite = operator new(sizeof(short)*2+sizeof(char)*22);
+    void* toWrite = operator new(sizeof(size_t) + sizeOfMsg);
     void* message = toWrite;
-    
+
+    *(size_t*)toWrite = sizeOfMsg;
+    toWrite = (size_t*)toWrite + 1;
     *(short*)toWrite = 0;
     toWrite = (short*)toWrite+1;
     *(short*)toWrite = 1;
@@ -66,7 +68,7 @@ void connectionClicked(GtkButton* self, gpointer data){
     strcpy((char*)toWrite, peerId);
     
 
-    int success = write(writingFifo, message, sizeof(short)*2+sizeof(char)*22);
+    int success = write(writingFifo, message, sizeof(size_t) + sizeOfMsg);
     handleError(success);
 
     operator delete(message);
@@ -169,9 +171,13 @@ char* getFullText(GtkTextBuffer* buffer){
 
 
 void sendMessage(const char* id, const char* peerId, const char* fullText){
-    void* message = operator new(MAX_SIZE);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*123;
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 0;
     message = (short*)message + 1;
     *(short*)message = 2;
@@ -182,7 +188,7 @@ void sendMessage(const char* id, const char* peerId, const char* fullText){
     message = (char*)message + 11;
     strcpy((char*)message, fullText);
 
-    write(writingFifo, toSend, MAX_SIZE);
+    write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
 
     operator delete(toSend);
 }
@@ -303,9 +309,13 @@ void processMessage(void* message, const char* id){
 }
 
 void sendOpenedMessage(const char* id){
-    void* message = operator new(sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
+    size_t sizeOfMsg = sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11;
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 0;
     message = (short*)message + 1;
     *(short*)message = 0;
@@ -314,7 +324,7 @@ void sendOpenedMessage(const char* id){
     message = (char*)message + 11;
     *(uid_t*)message = getuid();
 
-    int success = write(writingFifo, toSend, sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
+    int success = write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
 
     operator delete(toSend);
@@ -396,9 +406,13 @@ void setupClosedWindowCallback(GtkWindow* window, GMainLoop* mainLoop){
 
 
 void sendClosingMessage(const char* id){
-    void* leavingMessage = operator new(sizeof(short)*2+sizeof(char)*11+sizeof(uid_t));
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11+sizeof(uid_t);
+
+    void* leavingMessage = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = leavingMessage;
 
+    *(size_t*)leavingMessage = sizeOfMsg;
+    leavingMessage = (size_t*)leavingMessage + 1;
     *(short*)leavingMessage = 0;
     leavingMessage = (short*)leavingMessage + 1;
     *(short*)leavingMessage = 3;
@@ -407,7 +421,7 @@ void sendClosingMessage(const char* id){
     leavingMessage = (char*)leavingMessage + 11;
     *(uid_t*)leavingMessage = getuid();
 
-    int finalSuccess = write(writingFifo, toSend, sizeof(short)*2+sizeof(char)*11+sizeof(uid_t));
+    int finalSuccess = write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(finalSuccess);
 
     operator delete(toSend);

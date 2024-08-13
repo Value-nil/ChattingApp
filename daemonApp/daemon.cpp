@@ -204,7 +204,8 @@ void checkUsers(pollfd udpSocket){
 
 void processNewData(int fd, size_t msgSize){
     void* message = operator new(msgSize);
-    size_t readBytes = recv(fd, message, msgSize, MSG_WAITALL);
+    size_t readBytes = read(fd, message, msgSize);
+    cout << "Read bytes: " << readBytes << '\n';
     handleError(readBytes);
 
     if(*(short*)message == 0){

@@ -22,15 +22,19 @@ extern chToInt remoteUsers;
 
 
 void sendCurrentOnlinePeers(int localFd){
-    void* message = operator new(sizeof(short) + sizeof(char)*11);
+    size_t sizeOfMsg = sizeof(short) + sizeof(char)*11;
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 2;
     message = (short*)message + 1;
     
     for(int i = 0; i < remoteIDs.size(); i++){
         strcpy((char*)message, remoteIDs[i]);
-        int success = write(localFd, toSend, sizeof(short) + sizeof(char)*11);
+        int success = write(localFd, toSend, sizeof(size_t) + sizeOfMsg);
         handleError(success);
     }
     operator delete(toSend);
@@ -47,9 +51,13 @@ void initializeUser(const char* id, uid_t userId){
 }
 
 void sendContactRequest(const char* id, const char* peerId, bool isAccepting){
-    void* message = operator new(sizeof(short)*2+sizeof(char)*22);
+    size_t sizeOfMsg = sizeof(sizeof(short)*2+sizeof(char)*22);
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 1;
     message = (short*)message + 1;
     *(short*)message = isAccepting? 1 : 0;
@@ -61,16 +69,20 @@ void sendContactRequest(const char* id, const char* peerId, bool isAccepting){
     int remoteFd = remoteUsers[peerId];
     std::cout << "Sending request contact messsage to fd: " << remoteFd << '\n';
 
-    int success = write(remoteFd, toSend, sizeof(short)*2+sizeof(char)*22);
+    int success = write(remoteFd, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
 
     operator delete(toSend);
 }
 
 void processAcceptContact(const char* peerId, const char* id){
-    void* message = operator new(sizeof(short)+sizeof(char)*22);
+    size_t sizeOfMsg = sizeof(short) + sizeof(char)*22;
+
+    void* message = operator new(sizeof(size_t)+sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 3;
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
@@ -79,7 +91,7 @@ void processAcceptContact(const char* peerId, const char* id){
 
     int localFd = localUsers[id];
 
-    int success = write(localFd, toSend, sizeof(short)+sizeof(char)*22);
+    int success = write(localFd, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
 
     operator delete(toSend);
@@ -103,9 +115,13 @@ void checkRequestingPeers(const char* request, const char* id, const char* peerI
 }
 
 void sendMessage(char* id, char* peerId, char* actualMessage){
-    void* message = operator new(MAX_SIZE);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*123;
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 1;
     message = (short*)message + 1;
     *(short*)message = 2;
@@ -118,7 +134,7 @@ void sendMessage(char* id, char* peerId, char* actualMessage){
 
     int remoteFd = remoteUsers[peerId];
 
-    int success = write(remoteFd, toSend, MAX_SIZE);
+    int success = write(remoteFd, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
 
     operator delete(toSend);
@@ -184,16 +200,20 @@ void processFifo(void* message){
 }
 
 void sendIncomingMessage(int localFd, const char* peerId, const char* actualMessage){
-    void* message = operator new(sizeof(short)+sizeof(char)*112);
+    size_t sizeOfMsg = sizeof(short)+sizeof(char)*112;
+
+    void* message = operator new(sizeof(size_t)+ sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message;
     *(short*)message = 1;
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
     message = (char*)message + 11;
     strcpy((char*)message, actualMessage);
 
-    int success = write(localFd, toSend, sizeof(short)+sizeof(char)*112);
+    int success = write(localFd, toSend, sizeof(size_t)+ sizeOfMsg);
     handleError(success);
 
     operator delete(toSend);
@@ -262,7 +282,7 @@ void processTcp(void* message){
     else if(method == 4){//remove remote contact(the device is going to leave)
 
     }
-    else if(method == 5){//the remote daemon is stopping
+    else if(method == 5){//the remote daemon is stopping(may not be used)
 
     }
 }
