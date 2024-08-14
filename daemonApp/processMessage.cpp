@@ -35,6 +35,7 @@ void sendCurrentOnlinePeers(int localFd){
     message = (short*)message + 1;
     
     for(int i = 0; i < remoteIDs.size(); i++){
+        std::cout << "Sending ID " << remoteIDs[i] << " for local peer\n";
         strcpy((char*)message, remoteIDs[i]);
         int success = write(localFd, toSend, sizeof(size_t) + sizeOfMsg);
         handleError(success);
@@ -43,7 +44,7 @@ void sendCurrentOnlinePeers(int localFd){
 }
 
 
-void initializeUser(const char* id, uid_t userId){
+void initializeUser(const char* id){
     const char* fifoDir = getFifoPath(id, false);
     int localFd = openFifo(fifoDir, O_WRONLY);
 
@@ -161,17 +162,12 @@ void processFifo(void* message){
     message = (char*)message+11;
 
     if(method == 0){//app has opened
-        uid_t userId = *(uid_t*)message;
-        
-        initializeUser(id, userId);
-
-
+        initializeUser(id);
         std::cout << "App with id: " << id << " has opened\n";
     }
     else if(method == 1){//local user requesting contact
         //xor
-        char* peerId = new char[11];
-        strcpy(peerId, (const char*)message);
+        const char* peerId = (const char*)message
 
         char* request = buildRequest(id, peerId);
 
@@ -179,12 +175,10 @@ void processFifo(void* message){
         std::cout << "Local user is requesting contact with another peer\n";
     }
     else if(method == 2){//sending message
-        char* peerId = new char[11];
-        strcpy(peerId, (const char*)message);
+        char* peerId = (const char*)message;
         message = (char*)message+11;
 
-        char* actualMessage = new char[101];
-        strcpy(actualMessage, (const char*)message);
+        char* actualMessage = (const char*)message;
 
         sendMessage(id, peerId, actualMessage);
         std::cout << "Local user is sending message!\n";
@@ -296,7 +290,8 @@ void addNewRemoteContact(void* message, int fd){
     int peerNameSuccess = getpeername(fd, (sockaddr*)address, &size);
     handleError(peerNameSuccess);
 
-    const char* peerId = (const char*)message;
+    char* peerId = new char[11];
+    strcpy(peerId, (const char*)message);
 
     remoteUsers[peerId] = addressToFd[address->sin_addr];
     remoteIDs.push_back(peerId);

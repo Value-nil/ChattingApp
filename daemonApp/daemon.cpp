@@ -126,6 +126,7 @@ void setupUserDirectory(passwd* user){
 
     const char* id = checkForId(initialDirPath);
     localIDs.push_back(id);
+    std::cout << "Initializing " << id << " directory\n";
     createUserFifos(id, user->pw_uid);
 
     createMsgDir(initialDirPath);
@@ -208,6 +209,8 @@ void processNewData(int fd, size_t msgSize){
         processTcp((short*)message + 1, fd);
     }
     operator delete(message);
+
+    std::cout << "The new id is " << remoteIDs[remoteIDs.size()-1];
 }
 
 void deleteAddress(int fd){

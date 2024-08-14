@@ -310,7 +310,7 @@ void processMessage(void* message, const char* id){
 }
 
 void sendOpenedMessage(const char* id){
-    size_t sizeOfMsg = sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11;
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11;
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -322,8 +322,6 @@ void sendOpenedMessage(const char* id){
     *(short*)message = 0;
     message = (short*)message + 1;
     strcpy((char*)message, id);
-    message = (char*)message + 11;
-    *(uid_t*)message = getuid();
 
     int success = write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
