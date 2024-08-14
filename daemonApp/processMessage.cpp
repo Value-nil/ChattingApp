@@ -17,8 +17,10 @@
 
 extern chToInt localUsers;
 extern chVec remoteIDs;
+extern chVec localIDs;
 extern chVec requestedPeers;
 extern chToInt remoteUsers;
+extern addrToFd addressToFd;
 
 
 void sendCurrentOnlinePeers(int localFd){
@@ -261,8 +263,60 @@ void processRemoteRequest(void* message){
     std::cout << "Remote TCP is requesting contact!\n";
 }
 
+void sendNewContactToLocals(const char* peerId){
+
+    void* message = operator new(sizeof(short) + sizeof(char)*11);
+    void* toSend = message;
+
+    *(short*)message = 2;
+    message = (short*)message + 1;
+    strcpy((char*)message, peerId);
+
+    for(int i = 0; i < localIDs.size(); i++){
+        int fd = localUsers[localIDs[i]];
+        if(fd != 0){
+            int success = write(fd, toSend, sizeof(short) + sizeof(char)*11);
+            handleError(success);
+        } 
+
+        std::cout << "File descriptor for FIFO is: " << fd << '\n';
+        std::cout << "The ID it is reffering to: " << localIDs[i] << '\n';
+    }
+
+    operator delete(toSend);
+}
+
+void addNewRemoteContact(void* message, int fd){
+    sockaddr_in* address = new sockaddr_in;
+    socklen_t size = sizeof(sockaddr_in);
+
+    int peerNameSuccess = getpeername(fd, (sockaddr*)address, &size);
+    handleError(peerNameSuccess);
+
+    const char* peerId = (const char*)message;
+
+    remoteUsers[peerId] = addressToFd[address->sin_addr];
+    remoteIDs.push_back(peerId);
+
+    std::cout << "The fd for id " << peerId << " is: " << remoteUsers[peerId] << '\n';
+
+    sendNewContactToLocals(peerId);
+
+    delete address;
+}
+
+void removeRemoteContact(void* message){
+    const char* id = (const char*)message;
+    remoteUsers.erase(id);
+    for (int i = 0; i < remoteIDs.size(); i++){
+        if(!strcmp(remoteIDs[i], id)){
+            remoteIDs.erase(remoteIDs.begin()+i);
+        }
+    }
+}
+
 //keep in mind IDs are reversed!
-void processTcp(void* message){
+void processTcp(void* message, int fd){
     short method = *(short*)message;
     message = (short*)message + 1;
 
@@ -277,10 +331,10 @@ void processTcp(void* message){
         std::cout << "New incoming message\n";
     }
     else if(method == 3){//add new contact (the device just joined)
-
+        addNewRemoteContact(message, fd);
     }
     else if(method == 4){//remove remote contact(the device is going to leave)
-
+        removeRemoteContact(message);
     }
     else if(method == 5){//the remote daemon is stopping(may not be used)
 

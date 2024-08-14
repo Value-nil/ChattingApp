@@ -2,6 +2,7 @@
 #define UDP
 #include "daemonTypes.h"
 
-void sendNewUserNotification(int sock, const char* id, bool isFirstMessage);
-void processUdpMessage(void* message, sockaddr_in* address);
+void sendNewDeviceNotification(int sock);
+void processUdpMessage(sockaddr_in* address);
+void sendLocalContacts(int socket);
 #endif

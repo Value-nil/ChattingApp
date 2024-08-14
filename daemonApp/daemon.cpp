@@ -135,13 +135,8 @@ void setupUserDirectory(passwd* user){
     delete[] initialDirPath;
 }
 
-
-void processUser(passwd* user, int udpFd, bool isFirstMessage){
-    
+void processUser(passwd* user){
     setupUserDirectory(user);
-
-    //need to send isFirstMessage because when a peer receives just one udp message from a new peer, it will send all of its local users
-    sendNewUserNotification(udpFd, *(localIDs.end()-1), isFirstMessage);
 }
 
 //as I need to retrieve the sending address, I need to translate it to use recvfrom() instead of read()
@@ -151,15 +146,12 @@ void translateUdp(){
 
     int udpSocket = toRead[1].fd; //second fd of polling vector is udp socket
 
-    void* message = operator new(SIZE_MULTICAST);
-
-    int success = recvfrom(udpSocket, message, SIZE_MULTICAST, 0, (sockaddr*)address, &size);//0 for flags
+    int success = recvfrom(udpSocket, nullptr, 0, 0, (sockaddr*)address, &size);//0 for flags
     handleError(success);
 
-    processUdpMessage(message, address);
+    processUdpMessage(address);
 
     delete address;
-    operator delete(message);
 }
 
 void translateListeningTcp(){
@@ -168,7 +160,6 @@ void translateListeningTcp(){
 
     sockaddr_in* newPeer = new sockaddr_in;
     socklen_t size = sizeof(sockaddr_in);
-
     newConnection.fd = accept(listeningTcpSocket, (sockaddr*)newPeer, &size);
     newConnection.events = POLLIN;
 
@@ -179,6 +170,8 @@ void translateListeningTcp(){
     toRead.push_back(newConnection);
     addressToFd[newPeer->sin_addr] = newConnection.fd;//for other users a device might have
 
+    sendLocalContacts(newConnection.fd);
+
     cout << "Accepted new TCP socket: " << newConnection.fd;
 
     delete newPeer;
@@ -187,11 +180,9 @@ void translateListeningTcp(){
 
 void checkUsers(pollfd udpSocket){
     passwd* user = getpwent();
-    bool isFirstMessage = true;
     while(user != nullptr){
         if(user->pw_uid >= 1000 && user->pw_uid <= 59999){//checking for actually created users
-            processUser(user, udpSocket.fd, isFirstMessage);
-            isFirstMessage = false;
+            processUser(user);
         }
         //error handling for every user(making sure error handling is independent from every other user)
         errno = 0;
@@ -214,7 +205,7 @@ void processNewData(int fd, size_t msgSize){
     }
     else if(*(short*)message == 1){
         cout << "TCP polled\n";
-        processTcp((short*)message + 1);
+        processTcp((short*)message + 1, fd);
     }
     operator delete(message);
 }
@@ -266,8 +257,8 @@ int main(){
 
 
     createFifoDirectory();
-
     checkUsers(udpSocket);
+    sendNewDeviceNotification(udpSocket.fd);
 
     cout << std::flush;
     //main loop of polling
