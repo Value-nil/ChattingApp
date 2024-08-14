@@ -264,10 +264,13 @@ void processRemoteRequest(void* message){
 }
 
 void sendNewContactToLocals(const char* peerId){
+    size_t sizeOfMsg = sizeof(short) + sizeof(char)*11;
 
-    void* message = operator new(sizeof(short) + sizeof(char)*11);
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 2;
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
@@ -275,7 +278,7 @@ void sendNewContactToLocals(const char* peerId){
     for(int i = 0; i < localIDs.size(); i++){
         int fd = localUsers[localIDs[i]];
         if(fd != 0){
-            int success = write(fd, toSend, sizeof(short) + sizeof(char)*11);
+            int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
             handleError(success);
         } 
 

@@ -230,6 +230,7 @@ void processMessage(void* message, const char* id){
 
     char* peerId = new char[11];
     strcpy(peerId, (const char*)message);
+    std::cout << "Peer id is: " << peerId << '\n';
     message = (char*)message + 11;
 
     std::cout << method << " came in!\n";
@@ -364,6 +365,7 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
             void* message = operator new(sizeOfMsg);
             int readingSuccess = read(fd, message, sizeOfMsg);
             handleError(readingSuccess);
+            std::cout << "Bytes read: " << readingSuccess << '\n';
             processMessage(message, (const char*)user_data);//user_data is the id of the user
 
             operator delete(message);
