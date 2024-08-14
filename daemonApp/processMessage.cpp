@@ -117,7 +117,7 @@ void checkRequestingPeers(const char* request, const char* id, const char* peerI
 
 }
 
-void sendMessage(char* id, char* peerId, char* actualMessage){
+void sendMessage(const char* id, const char* peerId, const char* actualMessage){
     size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*123;
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
@@ -167,7 +167,7 @@ void processFifo(void* message){
     }
     else if(method == 1){//local user requesting contact
         //xor
-        const char* peerId = (const char*)message
+        const char* peerId = (const char*)message;
 
         char* request = buildRequest(id, peerId);
 
@@ -175,10 +175,10 @@ void processFifo(void* message){
         std::cout << "Local user is requesting contact with another peer\n";
     }
     else if(method == 2){//sending message
-        char* peerId = (const char*)message;
+        const char* peerId = (const char*)message;
         message = (char*)message+11;
 
-        char* actualMessage = (const char*)message;
+        const char* actualMessage = (const char*)message;
 
         sendMessage(id, peerId, actualMessage);
         std::cout << "Local user is sending message!\n";
