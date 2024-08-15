@@ -42,20 +42,26 @@ FIXING APP:
 -(DONE)Change addressToFd key type to non-pointer
 -(DONE)Change code to use non-pointer type in addrToFd
 -(DONE)Make 2 fifos instead of 1
--Fix segmentation fault
+-(DONE)Fix segmentation fault
 
 
 AFTER IT WORKS:
--Fix daemon closing fifo(cannot reopen app)
+-(DONE)Fix daemon closing fifo(cannot reopen app)
+-(DONE)Change message sending to allocate memory with dynamic size
+-(semi-done)Handle device leaving network(being switched off)
+-(DONE)Create directory for .xml file
+-(DONE)Handle instalation of app
+-(DONE)Consider changing protocol for dedicating a number to peer leaving(contact, not device)
+-(DONE)Make a debug log
+
 -Fix messages sometimes occupying all of the box space
 -When processing input text, take into account newline insertions in locations that are different from end of string
--Change message sending to allocate memory with dynamic size
--Implementing messages directories
+-Implementing messages and contacts saving
 -Tell FIFO about new contacts that are requesting(not a priority)
--Handle device leaving network(being switched off)
--Handle someone requesting your contact
--Create directory for .xml file
--Handle instalation of app
--Consider changing protocol for dedicating a number to peer leaving
--Make function to send fifo/message on socket p2p
--Make a debug log(DONE)
+    --Handle someone requesting your contact(send notification)
+
+
+
+Branch last objectives:
+-Add signal handler for sigterm, to send contacts leaving message
+-Make locally-sended messages appear
