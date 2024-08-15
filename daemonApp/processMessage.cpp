@@ -203,13 +203,13 @@ void sendIncomingMessage(int localFd, const char* peerId, const char* actualMess
     void* toSend = message;
 
     *(size_t*)message = sizeOfMsg;
-    message = (size_t*)message;
+    message = (size_t*)message + 1;
     *(short*)message = 1;
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
     message = (char*)message + 11;
     strcpy((char*)message, actualMessage);
-
+    
     int success = write(localFd, toSend, sizeof(size_t)+ sizeOfMsg);
     handleError(success);
 

@@ -359,6 +359,7 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
     if(condition & G_IO_IN){
         size_t sizeOfMsg;
         int success = read(fd, (void*)(&sizeOfMsg), sizeof(size_t));
+        std::cout << "Bytes intended to be read: " << sizeOfMsg << '\n';
         if(success > 0){
             void* message = operator new(sizeOfMsg);
             int readingSuccess = read(fd, message, sizeOfMsg);
@@ -381,6 +382,7 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
 
         return false;
     }
+    std::cout << "--------------------------\n";
     return true;
 }
 
