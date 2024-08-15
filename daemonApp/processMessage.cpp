@@ -54,7 +54,7 @@ void initializeUser(const char* id){
 }
 
 void sendContactRequest(const char* id, const char* peerId, bool isAccepting){
-    size_t sizeOfMsg = sizeof(sizeof(short)*2+sizeof(char)*22);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*22;
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -71,6 +71,7 @@ void sendContactRequest(const char* id, const char* peerId, bool isAccepting){
 
     int remoteFd = remoteUsers[peerId];
     std::cout << "Sending request contact messsage to fd: " << remoteFd << '\n';
+    std::cout << "Size of message: " << *(size_t*)message << '\n';
 
     int success = write(remoteFd, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
@@ -146,7 +147,7 @@ void sendMessage(const char* id, const char* peerId, const char* actualMessage){
 char* buildRequest(const char* id, const char* peerId){
     char* request = new char[11];
     for(int i = 0; i < 10; i++){
-        request[i] = (char)((const int)(id[i])^(const int)(peerId[i]));
+        *(request+i) = (char)(id[i]^peerId[i]);
     }
     request[10] = '\0';
 
@@ -295,6 +296,7 @@ void addNewRemoteContact(void* message, int fd){
 
     remoteUsers[peerId] = addressToFd[address->sin_addr];
     remoteIDs.push_back(peerId);
+    std::cout << "size of remoteIDs is: " << remoteIDs.size() << '\n';
 
     std::cout << "The fd for id " << peerId << " is: " << remoteUsers[peerId] << '\n';
 

@@ -197,6 +197,7 @@ void checkUsers(pollfd udpSocket){
 void processNewData(int fd, size_t msgSize){
     void* message = operator new(msgSize);
     size_t readBytes = read(fd, message, msgSize);
+    cout << "The message intended size is " << msgSize << '\n';
     cout << "Read bytes: " << readBytes << '\n';
     handleError(readBytes);
 
@@ -209,8 +210,6 @@ void processNewData(int fd, size_t msgSize){
         processTcp((short*)message + 1, fd);
     }
     operator delete(message);
-
-    std::cout << "The new id is " << remoteIDs[remoteIDs.size()-1];
 }
 
 void deleteAddress(int fd){
