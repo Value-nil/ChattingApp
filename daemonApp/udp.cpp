@@ -27,7 +27,8 @@ void sendUdpMulticastMessage(int sock){
     int success1 = connect(sock, (sockaddr*)multicastAddress, sizeof(sockaddr_in));
     handleError(success1);
 
-    int success2 = write(sock, nullptr, 0);
+    char a = 'a';
+    int success2 = write(sock, (void*)(&a), sizeof(char));
     handleError(success2);
 
     resetPeer(sock);

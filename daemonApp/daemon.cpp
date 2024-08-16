@@ -22,6 +22,8 @@
 #include <errno.h>
 #include <iostream>
 #include <poll.h>
+#include <signal.h>
+#include <stdlib.h>
 
 
 pollVec toRead; //for poll; includes readable socket fds
@@ -146,8 +148,8 @@ void translateUdp(){
     socklen_t size = sizeof(sockaddr_in);
 
     int udpSocket = toRead[1].fd; //second fd of polling vector is udp socket
-
-    int success = recvfrom(udpSocket, nullptr, 0, 0, (sockaddr*)address, &size);//0 for flags
+    char a;
+    int success = recvfrom(udpSocket, (void*)&a, sizeof(char), 0, (sockaddr*)address, &size);//0 for flags
     handleError(success);
 
     processUdpMessage(address);
@@ -249,6 +251,46 @@ void processNormalPolling(int index){
 }
 
 
+void sendClosingMessage(int signal){
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11;
+
+    void* closingMessage = operator new(sizeof(size_t) + sizeOfMsg);
+    void* toSend = closingMessage;
+
+    *(size_t*)closingMessage = sizeOfMsg;
+    closingMessage = (size_t*)closingMessage + 1;
+    *(short*)closingMessage = 1;
+    closingMessage = (short*)closingMessage + 1;
+    *(short*)closingMessage = 4;
+    closingMessage = (short*)closingMessage + 1;
+
+    cout << "Stopping app\n" << flush;
+
+    for(int i = 0; i < localIDs.size(); i++){
+        strcpy((char*)closingMessage, localIDs[i]);
+        for(auto j = addressToFd.begin(); j != addressToFd.end(); j++){
+            int fd = (*j).second;
+            if(fd != 0){
+                int success = write(fd, toSend, sizeof(size_t)+ sizeOfMsg);
+                handleError(success);
+            }
+        }
+    }
+
+    cout << "Finished stopping, exiting\n" << flush;
+
+    exit(EXIT_SUCCESS);
+}
+
+void connectTermSignal(){
+    struct sigaction* action = new struct sigaction;
+    action->sa_handler = &sendClosingMessage;
+    action->sa_flags = 0;
+
+    int success = sigaction(SIGTERM, action, nullptr);
+    handleError(success);
+
+}
 
 int main(){
     pollfd listeningSock = newListeningTcpSocket();
@@ -261,8 +303,9 @@ int main(){
     createFifoDirectory();
     checkUsers(udpSocket);
     sendNewDeviceNotification(udpSocket.fd);
+    connectTermSignal();
 
-    cout << std::flush;
+    cout << "finished initialization\n" << std::flush;
     //main loop of polling
     while(true){
         int success = poll(toRead.data(), toRead.size(), -1);

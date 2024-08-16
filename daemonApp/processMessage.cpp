@@ -306,6 +306,7 @@ void addNewRemoteContact(void* message, int fd){
 }
 
 void removeRemoteContact(void* message){
+    std::cout << "Removing peer contact\n";
     const char* id = (const char*)message;
     remoteUsers.erase(id);
     for (int i = 0; i < remoteIDs.size(); i++){
