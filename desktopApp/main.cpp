@@ -22,6 +22,7 @@
 GtkBox* addSubnetPeerButtons;
 GtkStack* conversationContainerStack;
 int writingFifo;
+chToBox messageBoxes;
 
 
 const char* XML_MAIN_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/mainGui.xml";
@@ -194,6 +195,7 @@ void sendMessage(const char* id, const char* peerId, const char* fullText){
 }
 
 void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
+    std::cout << "length: " << len << '\n';
     if(text[0] == '\n'){
         char* fullText = getFullText(self);
         if(strcmp(fullText, "") && strlen(fullText) <= 100){
@@ -203,6 +205,9 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
             const char* peerId = (const char*)id + 11;
 
 			sendMessage(id, peerId, fullText);
+
+            GtkFrame* messageFrame = newSentMessage((const char*)fullText);
+            gtk_box_append(messageBoxes[peerId], (GtkWidget*)messageFrame);
         }
     }
 }
@@ -223,7 +228,6 @@ void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, const char* id, con
 
 void processMessage(void* message, const char* id){
     static chToWidg subnetPeers; //includes non-accepted peers ONLY
-    static chToBox messageBoxes;
 
     short method = *(short*)message;
     message = (short*)message+1;
