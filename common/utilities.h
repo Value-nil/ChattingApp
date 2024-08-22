@@ -1,7 +1,8 @@
-#ifndef FIFO_UTILITES
-#define FIFO_UTILITES
+#ifndef COMMON_UTILITIES
+#define COMMON_UTILITIES
 
 void handleError(int returnInt);
-const char* getFifoPath(struct passwd* user, const char* fifoPath);
+const char* getFifoPath(const char* id, bool isAppToD);
 char* buildPath(const char* basePath, const char* relativePath);
+int openFifo(const char* path, int mode);
 #endif

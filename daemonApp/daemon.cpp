@@ -3,6 +3,7 @@
 #include "processMessage.h"
 #include "daemonConstants.h"
 #include "socketUtils.h"
+#include "fifoUtils.h"
 
 #include "../common/utilities.h"
 #include "../common/constants.h"
@@ -10,6 +11,7 @@
 
 
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/random.h>
 #include <sys/stat.h>
 #include <string.h>
@@ -20,6 +22,8 @@
 #include <errno.h>
 #include <iostream>
 #include <poll.h>
+#include <signal.h>
+#include <stdlib.h>
 
 
 pollVec toRead; //for poll; includes readable socket fds
@@ -67,22 +71,13 @@ char* retrieveId(char* idPath){
     return id;
 }
 
-char* createFifo(const char* initialDirPath, const char* fifoPath, bool shouldReturn){
-    char* fullFifoPath = buildPath(initialDirPath, fifoPath);
-
-    cout << "Fifo path is: " << fullFifoPath << '\n';
-
-    int fifoSuccess = mkfifo(fullFifoPath, ACCESS_MODE);
-    if(fifoSuccess == -1 && errno != 17)
-        handleError(-1);
-
-
-    if(shouldReturn)
-        return fullFifoPath;
-    
-    delete[] fullFifoPath;
-    return nullptr;
+void createFifoDirectory(){
+    int success = mkdir(FIFO_PATH, 0777);
+    cout << "Created fifo directory on /tmp\n";
+    handleError(success);
 }
+
+
 
 char* checkForId(char* initialDirPath){
     char* idPath = buildPath(initialDirPath, ID_PATH);
@@ -126,53 +121,40 @@ char* createInitialDir(passwd* user){
     return path;
 }
 
-char* setupUserDirectory(passwd* user){
+void setupUserDirectory(passwd* user){
     seteuid(user->pw_uid);
 
     char* initialDirPath = createInitialDir(user);
 
     const char* id = checkForId(initialDirPath);
     localIDs.push_back(id);
+    std::cout << "Initializing " << id << " directory\n";
+    createUserFifos(id, user->pw_uid);
+
     createMsgDir(initialDirPath);
-    createFifo(initialDirPath, D_TO_A_PATH, false);
-    char* fifoPath = createFifo(initialDirPath, A_TO_D_PATH, true);
 
     seteuid(getuid());
 
     delete[] initialDirPath;
-
-    return fifoPath;
 }
 
-
-int processUser(passwd* user, int udpFd, bool isFirstMessage){
-    
-    char* fifoDir = setupUserDirectory(user);
-
-    //need to send isFirstMessage because when a peer receives just one udp message from a new peer, it will send all of its local users
-    sendNewUserNotification(udpFd, *(localIDs.end()-1), isFirstMessage);
-
-    int fifoFd = open(fifoDir, O_RDONLY | O_NONBLOCK);
-    handleError(fifoFd);
-
-    return fifoFd;
+void processUser(passwd* user){
+    setupUserDirectory(user);
 }
 
 //as I need to retrieve the sending address, I need to translate it to use recvfrom() instead of read()
 void translateUdp(){
     sockaddr_in* address = new sockaddr_in;
-    socklen_t* size = new socklen_t;
-    *size = sizeof(sockaddr_in);
+    socklen_t size = sizeof(sockaddr_in);
 
     int udpSocket = toRead[1].fd; //second fd of polling vector is udp socket
-
-    void* message = operator new(SIZE_MULTICAST);
-
-    int success = recvfrom(udpSocket, message, SIZE_MULTICAST, 0, (sockaddr*)address, size);//0 for flags
+    char a;
+    int success = recvfrom(udpSocket, (void*)&a, sizeof(char), 0, (sockaddr*)address, &size);//0 for flags
     handleError(success);
 
-    processUdpMessage(message, address);
-    operator delete(message);
+    processUdpMessage(address);
+
+    delete address;
 }
 
 void translateListeningTcp(){
@@ -180,34 +162,30 @@ void translateListeningTcp(){
     int listeningTcpSocket = toRead[0].fd;    //first fd of polling vector is listening tcp
 
     sockaddr_in* newPeer = new sockaddr_in;
-    socklen_t* size = new socklen_t;
-    *size = sizeof(sockaddr_in);
-
-    newConnection.fd = accept(listeningTcpSocket, (sockaddr*)newPeer, size);
+    socklen_t size = sizeof(sockaddr_in);
+    newConnection.fd = accept(listeningTcpSocket, (sockaddr*)newPeer, &size);
     newConnection.events = POLLIN;
+
+    cout << "Address of peer: " << inet_ntoa(newPeer->sin_addr) << '\n';
 
     handleError(newConnection.fd);
                     
     toRead.push_back(newConnection);
     addressToFd[newPeer->sin_addr] = newConnection.fd;//for other users a device might have
 
+    sendLocalContacts(newConnection.fd);
+
     cout << "Accepted new TCP socket: " << newConnection.fd;
+
+    delete newPeer;
 }
 
 
 void checkUsers(pollfd udpSocket){
     passwd* user = getpwent();
-    bool isFirstMessage = true;
     while(user != nullptr){
         if(user->pw_uid >= 1000 && user->pw_uid <= 59999){//checking for actually created users
-            int fifoFd = processUser(user, udpSocket.fd, isFirstMessage);
-
-            pollfd fifo;
-            fifo.fd = fifoFd;
-            fifo.events = POLLIN;
-
-            toRead.push_back(fifo);
-            isFirstMessage = false;
+            processUser(user);
         }
         //error handling for every user(making sure error handling is independent from every other user)
         errno = 0;
@@ -218,38 +196,101 @@ void checkUsers(pollfd udpSocket){
     }
 }
 
-
-void processNormalPolling(int index){
-    int fd = toRead[index].fd;
-
-    void* message = operator new(MAX_SIZE);
-    int readBytes = read(fd, message, MAX_SIZE);
+void processNewData(int fd, size_t msgSize){
+    void* message = operator new(msgSize);
+    size_t readBytes = read(fd, message, msgSize);
+    cout << "The message intended size is " << msgSize << '\n';
+    cout << "Read bytes: " << readBytes << '\n';
     handleError(readBytes);
 
-    if(readBytes == 0){
-        int closingSuccess = close(fd);
-        toRead.erase(toRead.begin()+index);
-
-        handleError(closingSuccess);
-
-        cout << "Peer is leaving!\n";
-    }
     if(*(short*)message == 0){
-        //fifo
         cout << "FIFO polled\n";
         processFifo((short*)message + 1);
     }
     else if(*(short*)message == 1){
         cout << "TCP polled\n";
-        //socket
-        processTcp((short*)message + 1);
+        processTcp((short*)message + 1, fd);
     }
-    cout << "Data available\n";
-                
     operator delete(message);
 }
 
+void deleteAddress(int fd){
+    sockaddr_in* leavingAddr = new sockaddr_in;
+    socklen_t size = sizeof(sockaddr_in);
 
+    int peerNameSuccess = getpeername(fd, (sockaddr*)leavingAddr, &size);
+    handleError(peerNameSuccess);
+
+    addressToFd.erase(leavingAddr->sin_addr);
+        
+    cout << "Leaving address: " << inet_ntoa(leavingAddr->sin_addr) << '\n';
+
+    delete leavingAddr;
+}
+
+
+void processNormalPolling(int index){
+    int fd = toRead[index].fd;
+
+    size_t msgSize;
+    int success = read(fd, (void*)(&msgSize), sizeof(size_t));
+    handleError(success);
+
+    if(success > 0){
+        processNewData(fd, msgSize);
+    }
+    else{
+        cout << "Peer is leaving!\n";
+
+        deleteAddress(fd);
+        
+        int closingSuccess = close(fd);
+        handleError(closingSuccess);
+        toRead.erase(toRead.begin()+index);    
+    }
+}
+
+
+void sendClosingMessage(int signal){
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11;
+
+    void* closingMessage = operator new(sizeof(size_t) + sizeOfMsg);
+    void* toSend = closingMessage;
+
+    *(size_t*)closingMessage = sizeOfMsg;
+    closingMessage = (size_t*)closingMessage + 1;
+    *(short*)closingMessage = 1;
+    closingMessage = (short*)closingMessage + 1;
+    *(short*)closingMessage = 4;
+    closingMessage = (short*)closingMessage + 1;
+
+    cout << "Stopping app\n" << flush;
+
+    for(int i = 0; i < localIDs.size(); i++){
+        strcpy((char*)closingMessage, localIDs[i]);
+        for(auto j = addressToFd.begin(); j != addressToFd.end(); j++){
+            int fd = (*j).second;
+            if(fd != 0){
+                int success = write(fd, toSend, sizeof(size_t)+ sizeOfMsg);
+                handleError(success);
+            }
+        }
+    }
+
+    cout << "Finished stopping, exiting\n" << flush;
+
+    exit(EXIT_SUCCESS);
+}
+
+void connectTermSignal(){
+    struct sigaction* action = new struct sigaction;
+    action->sa_handler = &sendClosingMessage;
+    action->sa_flags = 0;
+
+    int success = sigaction(SIGTERM, action, nullptr);
+    handleError(success);
+
+}
 
 int main(){
     pollfd listeningSock = newListeningTcpSocket();
@@ -259,9 +300,12 @@ int main(){
     toRead.push_back(udpSocket);
 
 
+    createFifoDirectory();
     checkUsers(udpSocket);
+    sendNewDeviceNotification(udpSocket.fd);
+    connectTermSignal();
 
-
+    cout << "finished initialization\n" << std::flush;
     //main loop of polling
     while(true){
         int success = poll(toRead.data(), toRead.size(), -1);
@@ -308,6 +352,7 @@ int main(){
             }
         }
         cout << "----------------------------\n";
+        cout << std::flush;
     }
 
 

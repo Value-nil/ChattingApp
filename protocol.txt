@@ -13,3 +13,6 @@ Daemon to daemon tcp:
 0: a peer is requesting a contact with another peer
 1: a peer has accepted a contact from another peer
 2: new incoming message
+3: new contact
+4: contact leaving
+5: device leaving

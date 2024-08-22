@@ -1,0 +1,19 @@
+[Unit]
+Description=chattingappd
+AssertFileIsExecutable=/usr/local/sbin/chattingappd
+After=multi-user.target
+[Install]
+WantedBy=multi-user.target
+[Service]
+Type=exec
+ExecStart=/usr/local/sbin/chattingappd
+ExecStop=rm /tmp/chattingApp -rf
+UMask=0000
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET
+StandardOutput=journal
+StandardError=inherit

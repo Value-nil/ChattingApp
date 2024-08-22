@@ -22,11 +22,12 @@
 GtkBox* addSubnetPeerButtons;
 GtkStack* conversationContainerStack;
 int writingFifo;
+chToBox messageBoxes;
 
 
-const char* XML_MAIN_GUI_FILE = "/usr/share/chattingApp/guiFiles/mainGui.xml";
-const char* XML_CONVERSATION_GUI_FILE = "/usr/share/chattingApp/guiFiles/conversationContainerGui.xml";
-const char* XML_MESSAGE_GUI_FILE = "/usr/share/chattingApp/guiFiles/message.xml";
+const char* XML_MAIN_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/mainGui.xml";
+const char* XML_CONVERSATION_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/conversationContainerGui.xml";
+const char* XML_MESSAGE_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/message.xml";
 
 
 
@@ -51,12 +52,14 @@ void openSecondaryWindow(GtkButton* self, gpointer data){
 }
 
 void connectionClicked(GtkButton* self, gpointer data){
-    
     const char* peerId = gtk_button_get_label(self);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*22;
 
-    void* toWrite = operator new(sizeof(short)*2+sizeof(char)*22);
+    void* toWrite = operator new(sizeof(size_t) + sizeOfMsg);
     void* message = toWrite;
-    
+
+    *(size_t*)toWrite = sizeOfMsg;
+    toWrite = (size_t*)toWrite + 1;
     *(short*)toWrite = 0;
     toWrite = (short*)toWrite+1;
     *(short*)toWrite = 1;
@@ -66,7 +69,7 @@ void connectionClicked(GtkButton* self, gpointer data){
     strcpy((char*)toWrite, peerId);
     
 
-    int success = write(writingFifo, message, sizeof(short)*2+sizeof(char)*22);
+    int success = write(writingFifo, message, sizeof(size_t) + sizeOfMsg);
     handleError(success);
 
     operator delete(message);
@@ -157,6 +160,8 @@ char* getFullText(GtkTextBuffer* buffer){
     char* processedText = new char[strlen(text)+1];
     strcpy(processedText, text);
 
+    std::cout << "Processed text: " <<  processedText << '\n';
+
     free(toDelete);
 
 
@@ -167,9 +172,13 @@ char* getFullText(GtkTextBuffer* buffer){
 
 
 void sendMessage(const char* id, const char* peerId, const char* fullText){
-    void* message = operator new(MAX_SIZE);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*123;
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 0;
     message = (short*)message + 1;
     *(short*)message = 2;
@@ -180,12 +189,13 @@ void sendMessage(const char* id, const char* peerId, const char* fullText){
     message = (char*)message + 11;
     strcpy((char*)message, fullText);
 
-    write(writingFifo, toSend, MAX_SIZE);
+    write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
 
     operator delete(toSend);
 }
 
 void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
+    std::cout << "length: " << len << '\n';
     if(text[0] == '\n'){
         char* fullText = getFullText(self);
         if(strcmp(fullText, "") && strlen(fullText) <= 100){
@@ -195,6 +205,9 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
             const char* peerId = (const char*)id + 11;
 
 			sendMessage(id, peerId, fullText);
+
+            GtkFrame* messageFrame = newSentMessage((const char*)fullText);
+            gtk_box_append(messageBoxes[peerId], (GtkWidget*)messageFrame);
         }
     }
 }
@@ -215,13 +228,13 @@ void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, const char* id, con
 
 void processMessage(void* message, const char* id){
     static chToWidg subnetPeers; //includes non-accepted peers ONLY
-    static chToBox messageBoxes;
 
     short method = *(short*)message;
     message = (short*)message+1;
 
     char* peerId = new char[11];
     strcpy(peerId, (const char*)message);
+    std::cout << "Peer id is: " << peerId << '\n';
     message = (char*)message + 11;
 
     std::cout << method << " came in!\n";
@@ -301,18 +314,20 @@ void processMessage(void* message, const char* id){
 }
 
 void sendOpenedMessage(const char* id){
-    void* message = operator new(sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11;
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
 
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
     *(short*)message = 0;
     message = (short*)message + 1;
     *(short*)message = 0;
     message = (short*)message + 1;
     strcpy((char*)message, id);
-    message = (char*)message + 11;
-    *(uid_t*)message = getuid();
 
-    int success = write(writingFifo, toSend, sizeof(uid_t)+sizeof(short)*2+sizeof(char)*11);
+    int success = write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
 
     operator delete(toSend);
@@ -346,11 +361,21 @@ const char* retrieveId(){
 
 gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
     if(condition & G_IO_IN){
-        void* message = operator new(sizeof(short)+sizeof(char)*123);
-        read(fd, message, sizeof(short)+ sizeof(char)*123);
-        processMessage(message, (const char*)user_data);//user_data is the id of the user
+        size_t sizeOfMsg;
+        int success = read(fd, (void*)(&sizeOfMsg), sizeof(size_t));
+        std::cout << "Bytes intended to be read: " << sizeOfMsg << '\n';
+        if(success > 0){
+            void* message = operator new(sizeOfMsg);
+            int readingSuccess = read(fd, message, sizeOfMsg);
+            handleError(readingSuccess);
+            std::cout << "Bytes read: " << readingSuccess << '\n';
+            processMessage(message, (const char*)user_data);//user_data is the id of the user
 
-        operator delete(message);
+            operator delete(message);
+        }
+        else{
+            std::cerr << "The fifo has read with 0 bytes\n";
+        }
     }
     else{//error
         if(condition & (G_IO_ERR | G_IO_HUP)){
@@ -361,6 +386,7 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
 
         return false;
     }
+    std::cout << "--------------------------\n";
     return true;
 }
 
@@ -386,16 +412,22 @@ void setupClosedWindowCallback(GtkWindow* window, GMainLoop* mainLoop){
 
 
 void sendClosingMessage(const char* id){
-    void* leavingMessage = operator new(sizeof(short)*2+sizeof(char)*11);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11+sizeof(uid_t);
+
+    void* leavingMessage = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = leavingMessage;
 
+    *(size_t*)leavingMessage = sizeOfMsg;
+    leavingMessage = (size_t*)leavingMessage + 1;
     *(short*)leavingMessage = 0;
     leavingMessage = (short*)leavingMessage + 1;
     *(short*)leavingMessage = 3;
     leavingMessage = (short*)leavingMessage + 1;
     strcpy((char*)leavingMessage, id);
+    leavingMessage = (char*)leavingMessage + 11;
+    *(uid_t*)leavingMessage = getuid();
 
-    int finalSuccess = write(writingFifo, toSend, sizeof(short)*2+sizeof(char)*11);
+    int finalSuccess = write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(finalSuccess);
 
     operator delete(toSend);
@@ -403,10 +435,9 @@ void sendClosingMessage(const char* id){
 
 int main(){
     const char* id = retrieveId();
-    struct passwd* user = getpwuid(getuid());
 
-    const char* readingFifoPath = getFifoPath(user, D_TO_A_PATH);
-    const char* writingFifoPath = getFifoPath(user, A_TO_D_PATH);
+    const char* readingFifoPath = getFifoPath(id, false);
+    const char* writingFifoPath = getFifoPath(id, true);
 
     
     writingFifo = open(writingFifoPath, O_WRONLY | O_NONBLOCK);
@@ -417,8 +448,7 @@ int main(){
         return 1;
     }
     
-    int readingFifo = open(readingFifoPath, O_RDONLY | O_NONBLOCK);
-    handleError(readingFifo);
+    int readingFifo = openFifo(readingFifoPath, O_RDONLY | O_NONBLOCK);
 
     sendOpenedMessage(id);
 
