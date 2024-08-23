@@ -2,8 +2,14 @@ VPATH = daemonApp common desktopApp desktopApp/guiFiles
 
 DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o fifoUtils.o
 MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o cmpFuncs.o
-GUI_FILES_LOCATION ::= /usr/local/share/chattingApp/guiFiles
 GUI_FILES_TARGETS ::= conversationContainerGui.xml mainGui.xml message.xml
+
+
+PREFIX ::= /usr/local
+GUI_FILES_LOCATION ::= $(PREFIX)/share/chattingApp/guiFiles
+DAEMON_LOCATION ::= $(PREFIX)/sbin
+MAIN_APP_LOCATION ::= $(PREFIX)/bin
+UNIT_FILE_LOCATION ::= $(PREFIX)/lib/systemd/system
 
 all: chattingappd chattingApp
 
@@ -44,12 +50,22 @@ $(GUI_FILES_LOCATION)/%.xml: desktopApp/guiFiles/%.xml
 	mkdir -p /usr/local/share/chattingApp/guiFiles
 	cp $? -t /usr/local/share/chattingApp/guiFiles -r
 
-daemon_install: chattingappd chattingappd.service
-	cp chattingappd /usr/local/sbin
-	mkdir /usr/local/lib/systemd/system -p
-	cp chattingappd.service /usr/local/lib/systemd/system
-	systemctl enable /usr/local/lib/systemd/system/chattingappd.service
+
+
+daemon_install: $(DAEMON_LOCATION)/chattingappd $(UNIT_FILE_LOCATION)/chattingappd.service
+
+$(DAEMON_LOCATION)/chattingappd : chattingappd
+	cp chattingappd $(DAEMON_LOCATION) 
+	
+$(UNIT_FILE_LOCATION)/chattingappd.service : chattingappd.service $(DAEMON_LOCATION)/chattingappd
+	mkdir $(UNIT_FILE_LOCATION) -p
+	cp chattingappd.service $(UNIT_FILE_LOCATION)
+	systemctl enable chattingappd.service
 	systemctl restart chattingappd.service
 
-main_app_install: chattingApp
-	cp chattingApp /usr/local/bin
+
+
+main_app_install: $(MAIN_APP_LOCATION)/chattingApp
+
+$(MAIN_APP_LOCATION)/chattingApp : chattingApp
+	cp chattingApp $(MAIN_APP_LOCATION)
