@@ -69,3 +69,12 @@ main_app_install: $(MAIN_APP_LOCATION)/chattingApp
 
 $(MAIN_APP_LOCATION)/chattingApp : chattingApp
 	cp chattingApp $(MAIN_APP_LOCATION)
+
+uninstall:
+	-rm $(MAIN_APP_LOCATION)/chattingApp
+	-systemctl stop chattingappd
+	-systemctl disable chattingappd
+	-rm $(UNIT_FILE_LOCATION)/chattingappd.service
+	-rm $(DAEMON_LOCATION)/chattingappd
+	-rm -r $(GUI_FILES_LOCATION)
+
