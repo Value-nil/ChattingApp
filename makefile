@@ -78,3 +78,6 @@ uninstall:
 	-rm $(DAEMON_LOCATION)/chattingappd
 	-rm -r $(GUI_FILES_LOCATION)
 
+.PHONY = clean
+clean:
+	-rm *.o
