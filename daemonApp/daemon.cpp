@@ -266,7 +266,7 @@ void sendClosingMessage(int signal){
 
     cout << "Stopping app\n" << flush;
 
-    for(int i = 0; i < localIDs.size(); i++){
+    for(unsigned int i = 0; i < localIDs.size(); i++){
         strcpy((char*)closingMessage, localIDs[i]);
         for(auto j = addressToFd.begin(); j != addressToFd.end(); j++){
             int fd = (*j).second;
@@ -313,7 +313,7 @@ int main(){
 
         cout << "Current size on polling: " << toRead.size() << '\n';
 
-        for(int i = 0; i < toRead.size(); i++){
+        for(unsigned int i = 0; i < toRead.size(); i++){
             short revents = toRead[i].revents;
             if(revents != 0){
                 cout << toRead[i].fd << " fd polled\n";
@@ -356,7 +356,7 @@ int main(){
     }
 
 
-    for(int i = 0; i < toRead.size(); i++){
+    for(unsigned int i = 0; i < toRead.size(); i++){
         int success = close(toRead[i].fd);
         handleError(success);
     }

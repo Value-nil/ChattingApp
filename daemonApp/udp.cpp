@@ -51,7 +51,7 @@ void sendLocalContacts(int socket){
     *(short*)message = 3;
     message = (short*)message + 1;
 
-    for(int i = 0; i < localIDs.size(); i++){
+    for(unsigned int i = 0; i < localIDs.size(); i++){
         strcpy((char*)message, localIDs[i]);
         int writingSuccess = write(socket, toSend, sizeof(size_t)+ sizeOfMsg);
         handleError(writingSuccess);

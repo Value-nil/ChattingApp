@@ -34,7 +34,7 @@ void sendCurrentOnlinePeers(int localFd){
     *(short*)message = 2;
     message = (short*)message + 1;
     
-    for(int i = 0; i < remoteIDs.size(); i++){
+    for(unsigned int i = 0; i < remoteIDs.size(); i++){
         std::cout << "Sending ID " << remoteIDs[i] << " for local peer\n";
         strcpy((char*)message, remoteIDs[i]);
         int success = write(localFd, toSend, sizeof(size_t) + sizeOfMsg);
@@ -103,7 +103,7 @@ void processAcceptContact(const char* peerId, const char* id){
 
 void checkRequestingPeers(const char* request, const char* id, const char* peerId){
     bool hasBeenRequested = false;
-    for(int i = 0; i < requestedPeers.size(); i++){
+    for(unsigned int i = 0; i < requestedPeers.size(); i++){
         if(strcmp(request, requestedPeers[i]) == 0){
             sendContactRequest(id, peerId, true);
             processAcceptContact(peerId, id);
@@ -270,7 +270,7 @@ void sendNewContactToLocals(const char* peerId){
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
 
-    for(int i = 0; i < localIDs.size(); i++){
+    for(unsigned int i = 0; i < localIDs.size(); i++){
         int fd = localUsers[localIDs[i]];
         if(fd != 0){
             int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
@@ -309,7 +309,7 @@ void removeRemoteContact(void* message){
     std::cout << "Removing peer contact\n";
     const char* id = (const char*)message;
     remoteUsers.erase(id);
-    for (int i = 0; i < remoteIDs.size(); i++){
+    for (unsigned int i = 0; i < remoteIDs.size(); i++){
         if(!strcmp(remoteIDs[i], id)){
             remoteIDs.erase(remoteIDs.begin()+i);
         }

@@ -4,6 +4,11 @@ DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socket
 MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o cmpFuncs.o
 GUI_FILES_TARGETS ::= conversationContainerGui.xml mainGui.xml message.xml
 
+CC ::= g++
+CXX ::= g++
+CXXFLAGS ::= -Wall -Wextra -O2
+LDFLAGS ::= 
+
 
 PREFIX ::= /usr/local
 GUI_FILES_LOCATION ::= $(PREFIX)/share/chattingApp/guiFiles
@@ -14,7 +19,7 @@ UNIT_FILE_LOCATION ::= $(PREFIX)/lib/systemd/system
 all: chattingappd chattingApp
 
 chattingappd: $(DAEMON_TARGETS)
-	g++ $(DAEMON_TARGETS) -o chattingappd
+	$(CC) $(DAEMON_TARGETS) $(LDFLAGS) -o chattingappd
 
 cmpFuncs.o: cmpFuncs.cpp cmpFuncs.h
 
@@ -34,12 +39,14 @@ constants.o: constants.cpp constants.h
 
 fifoUtils.o: fifoUtils.cpp fifoUtils.h daemonTypes.h utilities.o daemonConstants.o
 
-
+chattingApp: LDFLAGS ::= `pkg-config --libs gtk4`
 chattingApp: $(MAIN_APP_TARGETS)
-	g++ $(MAIN_APP_TARGETS) -o chattingApp `pkg-config --libs gtk4`
+	$(CC) $(MAIN_APP_TARGETS) $(LDFLAGS) -o chattingApp
 
-mainApp.o: main.cpp
-	g++ -c -o mainApp.o desktopApp/main.cpp `pkg-config --cflags gtk4`
+
+mainApp.o: CXXFLAGS ::= `pkg-config --cflags gtk4` $(CXXFLAGS)
+mainApp.o: main.cpp 
+	$(CXX) -c desktopApp/main.cpp $(CXXFLAGS) -o mainApp.o
 
 
 install: gui_files daemon_install main_app_install
