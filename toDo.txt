@@ -61,3 +61,7 @@ AFTER IT WORKS:
 -Tell FIFO about new contacts that are requesting(not a priority)
     --Handle someone requesting your contact(send notification)
 
+
+BRANCH SPECIFIC OBJECTIVES:
+-Make register message function on daemon
+-Make parsing message function on main app
