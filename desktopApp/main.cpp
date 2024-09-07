@@ -172,7 +172,7 @@ char* getFullText(GtkTextBuffer* buffer){
 
 
 void sendMessage(const char* id, const char* peerId, const char* fullText){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*123;
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(uid_t)+sizeof(char)*123;
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -187,6 +187,8 @@ void sendMessage(const char* id, const char* peerId, const char* fullText){
     message = (char*)message + 11;
     strcpy((char*)message, peerId);
     message = (char*)message + 11;
+    *(uid_t*)message = getuid();
+    message = (uid_t*)message + 1;
     strcpy((char*)message, fullText);
 
     write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
@@ -431,6 +433,10 @@ void sendClosingMessage(const char* id){
     handleError(finalSuccess);
 
     operator delete(toSend);
+}
+
+void retrieveSavedMessages(){
+
 }
 
 int main(){

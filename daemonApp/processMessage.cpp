@@ -14,6 +14,7 @@
 #include <map>
 #include <iostream>
 #include <fcntl.h>
+#include <time.h>
 
 extern chToInt localUsers;
 extern chVec remoteIDs;
@@ -70,7 +71,7 @@ void sendContactRequest(const char* id, const char* peerId, bool isAccepting){
     strcpy((char*)message, peerId);
 
     int remoteFd = remoteUsers[peerId];
-    std::cout << "Sending request contact messsage to fd: " << remoteFd << '\n';
+    std::cout << "Sending request contact message to fd: " << remoteFd << '\n';
     std::cout << "Size of message: " << *(size_t*)message << '\n';
 
     int success = write(remoteFd, toSend, sizeof(size_t) + sizeOfMsg);
@@ -118,6 +119,30 @@ void checkRequestingPeers(const char* request, const char* id, const char* peerI
 
 }
 
+
+void registerMessage(const char* messageFilePath, const char* message, bool localIsSender){
+    int fd = open(messageFilePath, O_WRONLY | O_CREAT | O_APPEND);
+    handleError(fd);
+
+    size_t sizeOfEntry = sizeof(bool) + sizeof(time_t) + sizeof(char)*(strlen(message) + 1);
+    void* entry = operator new(sizeOfEntry);
+    void* toStore = entry;
+    
+    *(bool*)entry = localIsSender;
+    entry = (bool*)entry + 1;
+    time((time_t*)entry);
+    entry = (time_t*)entry + 1;
+    strcpy((char*)entry, message);
+    *((char*)entry + strlen(message)) = '\n'; //setting new line for separating from other entries
+    
+    int success = write(fd, toStore, sizeOfEntry);
+    handleError(success);
+
+    operator delete(toStore);
+    close(fd);
+
+}
+
 void sendMessage(const char* id, const char* peerId, const char* actualMessage){
     size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*123;
 
@@ -154,6 +179,17 @@ char* buildRequest(const char* id, const char* peerId){
     return request;
 }
 
+const char* getMessageFilePath(uid_t userId, const char* peerId){
+    struct passwd* passwdStruct = getpwuid(userId);
+    const char* baseDirPath = buildPath(passwdStruct->pw_dir, INITIAL_DIR_PATH);
+    const char* messageDirPath = buildPath(baseDirPath, MESSAGES_PATH);
+    const char* fullPath = buildPath(messageDirPath, peerId);
+
+    delete[] baseDirPath;
+    delete[] messageDirPath;
+    return fullPath;
+}
+
 void processFifo(void* message){
     short method = *(short*)message;
     message = (short*)message + 1;
@@ -179,9 +215,18 @@ void processFifo(void* message){
         const char* peerId = (const char*)message;
         message = (char*)message+11;
 
+	uid_t userId = *(uid_t*)message;
+	message = (uid_t*)message + 1;
+
+	const char* messagePath = getMessageFilePath(userId, peerId);
+
+
+
         const char* actualMessage = (const char*)message;
 
         sendMessage(id, peerId, actualMessage);
+	registerMessage(messagePath, actualMessage, true);
+	delete[] messagePath;
         std::cout << "Local user is sending message!\n";
     }
     else if(method == 3){//app is being closed

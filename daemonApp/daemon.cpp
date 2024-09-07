@@ -181,7 +181,7 @@ void translateListeningTcp(){
 }
 
 
-void checkUsers(pollfd udpSocket){
+void checkUsers(){
     passwd* user = getpwent();
     while(user != nullptr){
         if(user->pw_uid >= 1000 && user->pw_uid <= 59999){//checking for actually created users
@@ -301,7 +301,7 @@ int main(){
 
 
     createFifoDirectory();
-    checkUsers(udpSocket);
+    checkUsers();
     sendNewDeviceNotification(udpSocket.fd);
     connectTermSignal();
 
