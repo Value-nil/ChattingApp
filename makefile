@@ -62,7 +62,8 @@ $(GUI_FILES_LOCATION)/%.xml: desktopApp/guiFiles/%.xml
 daemon_install: $(DAEMON_LOCATION)/chattingappd $(UNIT_FILE_LOCATION)/chattingappd.service
 
 $(DAEMON_LOCATION)/chattingappd : chattingappd
-	cp chattingappd $(DAEMON_LOCATION) 
+	-systemctl stop chattingappd.service
+	cp chattingappd $(DAEMON_LOCATION)
 	
 $(UNIT_FILE_LOCATION)/chattingappd.service : chattingappd.service $(DAEMON_LOCATION)/chattingappd
 	mkdir $(UNIT_FILE_LOCATION) -p

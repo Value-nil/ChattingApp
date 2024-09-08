@@ -18,7 +18,6 @@
 
 extern chToInt localUsers;
 extern chVec remoteIDs;
-extern chVec localIDs;
 extern chVec requestedPeers;
 extern chToInt remoteUsers;
 extern addrToFd addressToFd;
@@ -220,12 +219,11 @@ void processFifo(void* message){
 
 	const char* messagePath = getMessageFilePath(userId, peerId);
 
-
-
         const char* actualMessage = (const char*)message;
 
         sendMessage(id, peerId, actualMessage);
 	registerMessage(messagePath, actualMessage, true);
+
 	delete[] messagePath;
         std::cout << "Local user is sending message!\n";
     }
@@ -268,12 +266,14 @@ void processIncomingMessage(void* message){
 
     const char* id = (const char*)message;
     message = (char*)message + 11;
+
     int localFd = localUsers[id];
     if(localFd <= 0) return; //the user is offline
 
     const char* actualMessage = (const char*)message;
 
     sendIncomingMessage(localFd, peerId, actualMessage);
+    std::cout << "New incoming message\n";
 }
 
 void processPeerAcceptedContact(void* message){
@@ -315,15 +315,15 @@ void sendNewContactToLocals(const char* peerId){
     message = (short*)message + 1;
     strcpy((char*)message, peerId);
 
-    for(unsigned int i = 0; i < localIDs.size(); i++){
-        int fd = localUsers[localIDs[i]];
+    for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
+        int fd = (*iter).second;
         if(fd != 0){
             int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
             handleError(success);
         } 
 
         std::cout << "File descriptor for FIFO is: " << fd << '\n';
-        std::cout << "The ID it is reffering to: " << localIDs[i] << '\n';
+        std::cout << "The ID it is reffering to: " << (*iter).first << '\n';
     }
 
     operator delete(toSend);
@@ -374,7 +374,6 @@ void processTcp(void* message, int fd){
     }
     else if(method == 2){//new message incoming
         processIncomingMessage(message);
-        std::cout << "New incoming message\n";
     }
     else if(method == 3){//add new contact (the device just joined)
         addNewRemoteContact(message, fd);

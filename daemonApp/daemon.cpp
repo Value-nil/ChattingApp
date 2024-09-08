@@ -28,7 +28,6 @@
 
 pollVec toRead; //for poll; includes readable socket fds
 chVec requestedPeers;//indicates peers that requested contacting with another peer
-chVec localIDs;//IDs from this device
 chVec remoteIDs;//IDs from peers that are online
 chToInt localUsers; //local user id to fifo fd
 chToInt remoteUsers; //remote user id to writeable socket fd
@@ -127,7 +126,7 @@ void setupUserDirectory(passwd* user){
     char* initialDirPath = createInitialDir(user);
 
     const char* id = checkForId(initialDirPath);
-    localIDs.push_back(id);
+    localUsers[id] = 0;
     std::cout << "Initializing " << id << " directory\n";
     createUserFifos(id, user->pw_uid);
 
@@ -266,8 +265,8 @@ void sendClosingMessage(int signal){
 
     cout << "Stopping app\n" << flush;
 
-    for(unsigned int i = 0; i < localIDs.size(); i++){
-        strcpy((char*)closingMessage, localIDs[i]);
+    for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
+        strcpy((char*)closingMessage, (*iter).first);
         for(auto j = addressToFd.begin(); j != addressToFd.end(); j++){
             int fd = (*j).second;
             if(fd != 0){

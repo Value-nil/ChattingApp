@@ -12,7 +12,6 @@
 #include "socketUtils.h"
 #include "daemonConstants.h"
 
-extern chVec localIDs;
 extern pollVec toRead;
 extern addrToFd addressToFd;
 extern chToInt remoteUsers;
@@ -51,8 +50,8 @@ void sendLocalContacts(int socket){
     *(short*)message = 3;
     message = (short*)message + 1;
 
-    for(unsigned int i = 0; i < localIDs.size(); i++){
-        strcpy((char*)message, localIDs[i]);
+    for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
+        strcpy((char*)message, (*iter).first);
         int writingSuccess = write(socket, toSend, sizeof(size_t)+ sizeOfMsg);
         handleError(writingSuccess);
     }
