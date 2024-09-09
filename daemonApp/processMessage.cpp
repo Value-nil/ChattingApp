@@ -17,7 +17,6 @@
 #include <time.h>
 
 extern chToInt localUsers;
-extern chVec remoteIDs;
 extern chVec requestedPeers;
 extern chToInt remoteUsers;
 extern addrToFd addressToFd;
@@ -34,9 +33,9 @@ void sendCurrentOnlinePeers(int localFd){
     *(short*)message = 2;
     message = (short*)message + 1;
     
-    for(unsigned int i = 0; i < remoteIDs.size(); i++){
-        std::cout << "Sending ID " << remoteIDs[i] << " for local peer\n";
-        strcpy((char*)message, remoteIDs[i]);
+    for(auto iter = remoteUsers.begin(); iter != remoteUsers.end(); iter++){
+        std::cout << "Sending ID " << (*iter).first << " for local peer\n";
+        strcpy((char*)message, (*iter).first);
         int success = write(localFd, toSend, sizeof(size_t) + sizeOfMsg);
         handleError(success);
     }
@@ -340,8 +339,7 @@ void addNewRemoteContact(void* message, int fd){
     strcpy(peerId, (const char*)message);
 
     remoteUsers[peerId] = addressToFd[address->sin_addr];
-    remoteIDs.push_back(peerId);
-    std::cout << "size of remoteIDs is: " << remoteIDs.size() << '\n';
+    std::cout << "size of remoteUsers is: " << remoteUsers.size() << '\n';
 
     std::cout << "The fd for id " << peerId << " is: " << remoteUsers[peerId] << '\n';
 
@@ -354,11 +352,6 @@ void removeRemoteContact(void* message){
     std::cout << "Removing peer contact\n";
     const char* id = (const char*)message;
     remoteUsers.erase(id);
-    for (unsigned int i = 0; i < remoteIDs.size(); i++){
-        if(!strcmp(remoteIDs[i], id)){
-            remoteIDs.erase(remoteIDs.begin()+i);
-        }
-    }
 }
 
 //keep in mind IDs are reversed!

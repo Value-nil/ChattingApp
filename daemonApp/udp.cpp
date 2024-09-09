@@ -16,8 +16,6 @@ extern pollVec toRead;
 extern addrToFd addressToFd;
 extern chToInt remoteUsers;
 extern chToInt localUsers;
-extern chVec remoteIDs;
-
 
 
 void sendUdpMulticastMessage(int sock){

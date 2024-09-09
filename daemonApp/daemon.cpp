@@ -28,7 +28,6 @@
 
 pollVec toRead; //for poll; includes readable socket fds
 chVec requestedPeers;//indicates peers that requested contacting with another peer
-chVec remoteIDs;//IDs from peers that are online
 chToInt localUsers; //local user id to fifo fd
 chToInt remoteUsers; //remote user id to writeable socket fd
 addrToFd addressToFd;//from addresses to (possible)file descriptors
