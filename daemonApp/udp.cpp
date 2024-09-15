@@ -13,30 +13,25 @@
 #include "daemonConstants.h"
 
 extern pollVec toRead;
-extern addrToFd addressToFd;
-extern chToInt remoteUsers;
-extern chToInt localUsers;
+extern idToFd remoteDevices;
+extern idToFd localUsers;
+extern deviceid_t deviceId;
 
 
-void sendUdpMulticastMessage(int sock){
+void sendNewDeviceNotification(int sock){//sends a multicast message
     sockaddr_in* multicastAddress = newMulticastSendingAddress();
 
     int success1 = connect(sock, (sockaddr*)multicastAddress, sizeof(sockaddr_in));
     handleError(success1);
 
-    char a = 'a';
-    int success2 = write(sock, (void*)(&a), sizeof(char));
+    int success2 = write(sock, &deviceId, sizeof(deviceid_t));
     handleError(success2);
 
     resetPeer(sock);
 }
 
-void sendNewDeviceNotification(int sock){
-    sendUdpMulticastMessage(sock);
-}
-
 void sendLocalContacts(int socket){
-    size_t sizeOfMsg = sizeof(short)*2 + sizeof(char)*11;
+    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t);
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -49,7 +44,8 @@ void sendLocalContacts(int socket){
     message = (short*)message + 1;
 
     for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
-        strcpy((char*)message, (*iter).first);
+	*(deviceid_t*)message = deviceId | (deviceid_t)((*iter).first);
+
         int writingSuccess = write(socket, toSend, sizeof(size_t)+ sizeOfMsg);
         handleError(writingSuccess);
     }
@@ -68,13 +64,31 @@ void connectToPeerListeningTcp(int fd, sockaddr_in* address){
     address->sin_port = htons(SENDING_PORT); //revert port changes
 }
 
-void makeNewDeviceConnection(sockaddr_in* address){
+void sendDeviceIdToPeer(int fd){
+    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t);
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
+    void* toSend = message;
+
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
+    *(short*)message = 1;
+    message = (short*)message + 1;
+    *(short*)message = 5;
+    message = (short*)message + 1;
+    *(deviceid_t*)message = deviceId;
+
+    int success = write(fd, toSend, sizeof(deviceid_t));
+    handleError(success);
+}
+
+
+void makeNewDeviceConnection(deviceid_t peerDeviceId, sockaddr_in* address){
     //each device has its own socket, so a new socket is needed for every device(address)
     pollfd newtcp = newConnectingTcpSocket();
     connectToPeerListeningTcp(newtcp.fd, address);
+    sendDeviceIdToPeer(newtcp.fd);
 
-    addressToFd[address->sin_addr] = newtcp.fd;
-
+    remoteDevices[peerDeviceId] = newtcp.fd;
     toRead.push_back(newtcp);
 
     sendLocalContacts(newtcp.fd);
@@ -82,7 +96,7 @@ void makeNewDeviceConnection(sockaddr_in* address){
     std::cout << "New TCP socket created with fd: " << newtcp.fd << '\n';
 }
 
-void processUdpMessage(sockaddr_in* address){
+void processUdpMessage(deviceid_t peerDeviceId, sockaddr_in* address){
     std::cout << "New device on subnet\n";
-    makeNewDeviceConnection(address);
+    makeNewDeviceConnection(peerDeviceId, address);
 }

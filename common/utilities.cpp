@@ -1,11 +1,25 @@
 #include "utilities.h"
 #include "constants.h"
+
 #include <pwd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <iostream>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
+
+
+char* stringifyId(deviceid_t id){
+    char* buffer = new char[21];
+    snprintf(buffer, 21, "%llu", id);
+    std::cout << "Stringified ID is " << buffer << '\n';
+    return buffer;
+}
+
+deviceid_t unstringifyId(char* id){
+    return strtoull(id, nullptr, 10);
+}
 
 void handleError(int returnInt){
     if(returnInt < 0){
@@ -14,9 +28,11 @@ void handleError(int returnInt){
     }
 }
 
-const char* getFifoPath(const char* id, bool isAppToD){
-    const char* fifoIdPath = buildPath(FIFO_PATH, id);
+const char* getFifoPath(deviceid_t id, bool isAppToD){
+    const char* stringifiedId = stringifyId(id);
+    const char* fifoIdPath = buildPath(FIFO_PATH, stringifiedId);
     const char* fullFifoPath = buildPath(fifoIdPath, isAppToD? "_r" : "_w");
+    delete[] stringifiedId;
     delete[] fifoIdPath;
 
     return fullFifoPath;
@@ -35,3 +51,5 @@ int openFifo(const char* path, int mode){
     handleError(fd);
     return fd;
 }
+
+

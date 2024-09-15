@@ -3,6 +3,6 @@
 #include "daemonTypes.h"
 
 void sendNewDeviceNotification(int sock);
-void processUdpMessage(sockaddr_in* address);
+void processUdpMessage(deviceid_t peerDeviceId, sockaddr_in* address);
 void sendLocalContacts(int socket);
 #endif

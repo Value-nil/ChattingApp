@@ -3,8 +3,8 @@
 
 #include <unistd.h>
 
-void createUserFifos(const char* id, uid_t userId);
-void restartUserFifos(const char* id, uid_t userId);
+void createUserFifos(uid_t userId);
+void restartUserFifos(uid_t userId);
 
 
 

@@ -1,20 +1,20 @@
-#ifndef TYPES
-#define TYPES
+#ifndef DAEMON_TYPES
+#define DAEMON_TYPES
 
 #include <netinet/in.h>
 #include <map>
 #include <vector>
 #include <poll.h>
 
-#include "../common/cmpFuncs.h"
+#include "../common/types.h"
 
 
 
 
-typedef std::map<const char*, int, cmp_str> chToInt;
-typedef std::vector<const char*> chVec;
+typedef std::map<deviceid_t, int> idToFd;
+typedef std::vector<deviceid_t> idVec;
 typedef std::vector<pollfd> pollVec;
-typedef std::map<in_addr, int, cmp_addr> addrToFd;
+typedef std::map<in_addr, int> addrToFd;
 
 
 
