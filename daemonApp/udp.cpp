@@ -77,7 +77,7 @@ void sendDeviceIdToPeer(int fd){
     message = (short*)message + 1;
     *(deviceid_t*)message = deviceId;
 
-    int success = write(fd, toSend, sizeof(deviceid_t));
+    int success = write(fd, toSend, sizeof(size_t)+sizeOfMsg);
     handleError(success);
 }
 
