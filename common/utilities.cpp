@@ -17,7 +17,7 @@ char* stringifyId(deviceid_t id){
     return buffer;
 }
 
-deviceid_t unstringifyId(char* id){
+deviceid_t unstringifyId(const char* id){
     return strtoull(id, nullptr, 10);
 }
 

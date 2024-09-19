@@ -22,15 +22,12 @@
 GtkBox* addSubnetPeerButtons;
 GtkStack* conversationContainerStack;
 int writingFifo;
-chToBox messageBoxes;
+idToBox messageBoxes;
 
 
 const char* XML_MAIN_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/mainGui.xml";
 const char* XML_CONVERSATION_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/conversationContainerGui.xml";
 const char* XML_MESSAGE_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/message.xml";
-
-
-
 
 
 
@@ -52,8 +49,11 @@ void openSecondaryWindow(GtkButton* self, gpointer data){
 }
 
 void connectionClicked(GtkButton* self, gpointer data){
-    const char* peerId = gtk_button_get_label(self);
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*22;
+    deviceid_t peerId = *(deviceid_t*)data;
+    deviceid_t id = (deviceid_t)getuid();
+    std::cout << "Peer id is: " << peerId << '\n';
+
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2;
 
     void* toWrite = operator new(sizeof(size_t) + sizeOfMsg);
     void* message = toWrite;
@@ -64,9 +64,9 @@ void connectionClicked(GtkButton* self, gpointer data){
     toWrite = (short*)toWrite+1;
     *(short*)toWrite = 1;
     toWrite = (short*)toWrite+1;
-    strcpy((char*)toWrite, (const char*)data);
-    toWrite = (char*)toWrite + 11;
-    strcpy((char*)toWrite, peerId);
+    *(deviceid_t*)toWrite = id;
+    toWrite = (deviceid_t*)toWrite + 1;
+    *(deviceid_t*)toWrite = peerId;
     
 
     int success = write(writingFifo, message, sizeof(size_t) + sizeOfMsg);
@@ -120,13 +120,14 @@ GtkWindow* startGtk(){
 }
 
 
-GtkWidget* addNewSubnetPeer(const char* peerId, const char* id){
-    char* sendingId = new char[11];
-    strcpy(sendingId, id);
+GtkWidget* addNewSubnetPeer(deviceid_t peerId){
+    deviceid_t* peerIdAlloc = new deviceid_t;
+    *peerIdAlloc = peerId;
 
-    GtkWidget* addContactButton = gtk_button_new_with_label(peerId);
+    const char* stringifiedPeerId = stringifyId(peerId);
+    GtkWidget* addContactButton = gtk_button_new_with_label(stringifiedPeerId);
     gtk_widget_set_hexpand(addContactButton, true);
-    g_signal_connect(addContactButton, "clicked", (GCallback)connectionClicked, sendingId);
+    g_signal_connect(addContactButton, "clicked", (GCallback)connectionClicked, peerIdAlloc);
 
     gtk_box_append(addSubnetPeerButtons, addContactButton);
     return addContactButton;
@@ -171,8 +172,8 @@ char* getFullText(GtkTextBuffer* buffer){
 
 
 
-void sendMessage(const char* id, const char* peerId, const char* fullText){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(uid_t)+sizeof(char)*123;
+void sendMessage(deviceid_t id, deviceid_t peerId, const char* fullText){
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2+sizeof(char)*101;
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -183,12 +184,10 @@ void sendMessage(const char* id, const char* peerId, const char* fullText){
     message = (short*)message + 1;
     *(short*)message = 2;
     message = (short*)message + 1;
-    strcpy((char*)message, id);
-    message = (char*)message + 11;
-    strcpy((char*)message, peerId);
-    message = (char*)message + 11;
-    *(uid_t*)message = getuid();
-    message = (uid_t*)message + 1;
+    *(deviceid_t*)message = id;
+    message = (deviceid_t*)message + 1;
+    *(deviceid_t*)message = peerId;
+    message = (deviceid_t*)message + 1;
     strcpy((char*)message, fullText);
 
     write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
@@ -203,10 +202,10 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
         if(strcmp(fullText, "") && strlen(fullText) <= 100){
             gtk_text_buffer_set_text(self, "", 0);
             
-            const char* id = (const char*)user_data;
-            const char* peerId = (const char*)id + 11;
+	    deviceid_t id = (deviceid_t)getuid();
+            deviceid_t peerId = *(deviceid_t*)user_data;
 
-			sendMessage(id, peerId, fullText);
+	    sendMessage(id, peerId, fullText);
 
             GtkFrame* messageFrame = newSentMessage((const char*)fullText);
             gtk_box_append(messageBoxes[peerId], (GtkWidget*)messageFrame);
@@ -215,33 +214,25 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
 }
 
 
-void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, const char* id, const char* peerId){
-    char* ids = new char[22];
-    char* toSend = ids;
-
-    strcpy(ids, id);
-    ids += 11;
-    strcpy(ids, peerId);
-
-    g_signal_connect_after(inputTextBuffer, "insert-text", (GCallback)processCharacterInserted, (void*)toSend);
+void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, deviceid_t peerId){
+    deviceid_t* peerIdAlloc = new deviceid_t;
+    *peerIdAlloc = peerId;
+    g_signal_connect_after(inputTextBuffer, "insert-text", (GCallback)processCharacterInserted, peerIdAlloc);
 }
 
 
 
-void processMessage(void* message, const char* id){
-    static chToWidg subnetPeers; //includes non-accepted peers ONLY
+void processMessage(void* message){
+    static idToWidg subnetPeers; //includes non-accepted peers ONLY
 
     short method = *(short*)message;
     message = (short*)message+1;
 
-    char* peerId = new char[11];
-    strcpy(peerId, (const char*)message);
+    deviceid_t peerId = *(deviceid_t*)message;
     std::cout << "Peer id is: " << peerId << '\n';
-    message = (char*)message + 11;
+    message = (deviceid_t*)message + 1;
 
     std::cout << method << " came in!\n";
-    
-
 
     switch(method){
         case 0://requested contact
@@ -266,24 +257,25 @@ void processMessage(void* message, const char* id){
         case 2:
             //new device on subnet
             {
-                subnetPeers[peerId] = addNewSubnetPeer(peerId, id);
+                subnetPeers[peerId] = addNewSubnetPeer(peerId);
                 std::cout << "New device on subnet\n";
                 break;
             }
         case 3:
             //someone accepted your connection
             {
+		const char* stringifiedPeerId = stringifyId(peerId);
                 //building the conversation from xml file, making sure to setup everything
                 GtkBuilder* conversationBuilder = gtk_builder_new_from_file(XML_CONVERSATION_GUI_FILE);
 
                 GtkBox* conversationContainer = (GtkBox*)gtk_builder_get_object(conversationBuilder, "conversationContainer");
-                gtk_stack_add_titled(conversationContainerStack, (GtkWidget*)conversationContainer, peerId, peerId);
+                gtk_stack_add_titled(conversationContainerStack, (GtkWidget*)conversationContainer, stringifiedPeerId, stringifiedPeerId);
 
                 GtkBox* messageBox = (GtkBox*)gtk_builder_get_object(conversationBuilder, "messageBox");
                 messageBoxes[peerId] = messageBox;
 
                 GtkTextBuffer* inputTextBuffer = (GtkTextBuffer*)gtk_builder_get_object(conversationBuilder, "inputTextBuffer");
-                setupInsertTextCallback(inputTextBuffer, id, peerId);
+                setupInsertTextCallback(inputTextBuffer, peerId);
 
 
                 removeSubnetPeer(subnetPeers[peerId]);
@@ -300,13 +292,14 @@ void processMessage(void* message, const char* id){
                 removeSubnetPeer(subnetPeers[peerId]);
                 subnetPeers.erase(peerId);
 
+		const char* stringifiedPeerId = stringifyId(peerId);
 
-                GtkWidget* conversationContainer = gtk_stack_get_child_by_name(conversationContainerStack, peerId);
+                GtkWidget* conversationContainer = gtk_stack_get_child_by_name(conversationContainerStack, stringifiedPeerId);
                 if(conversationContainer != NULL){
                     gtk_stack_remove(conversationContainerStack, conversationContainer);
                 }
 
-                messageBoxes[peerId] = nullptr;
+		messageBoxes.erase(peerId);
 
                 std::cout << "A contact has left\n";
 
@@ -315,8 +308,8 @@ void processMessage(void* message, const char* id){
     }
 }
 
-void sendOpenedMessage(const char* id){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11;
+void sendOpenedMessage(){
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t);
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -327,7 +320,7 @@ void sendOpenedMessage(const char* id){
     message = (short*)message + 1;
     *(short*)message = 0;
     message = (short*)message + 1;
-    strcpy((char*)message, id);
+    *(deviceid_t*)message = (deviceid_t)getuid();
 
     int success = write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
@@ -340,26 +333,6 @@ const char* getHomeDirPath(){
     return user->pw_dir;
 }
 
-const char* retrieveId(){
-    char* id = new char[11];
-
-    const char* homeDirPath = getHomeDirPath();
-    char* baseDirPath = buildPath(homeDirPath, INITIAL_DIR_PATH);
-    char* idPath = buildPath(baseDirPath, ID_PATH);
-    delete[] baseDirPath;
-
-    int fd = open(idPath, O_RDONLY);
-    handleError(fd);
-
-    delete[] idPath;
-
-    int readSuccess = read(fd, id, sizeof(char)*11);//created by daemon, should alr come with null terminator
-    handleError(readSuccess);
-
-    close(fd);
-
-    return (const char*)id;
-}
 
 gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
     if(condition & G_IO_IN){
@@ -371,8 +344,7 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
             int readingSuccess = read(fd, message, sizeOfMsg);
             handleError(readingSuccess);
             std::cout << "Bytes read: " << readingSuccess << '\n';
-            processMessage(message, (const char*)user_data);//user_data is the id of the user
-
+            processMessage(message);
             operator delete(message);
         }
         else{
@@ -393,12 +365,9 @@ gboolean fifoCallback(gint fd, GIOCondition condition, gpointer user_data){
 }
 
 
-GSource* setupFifoSource(int readingFd, const char* id){
-    char* sendingId = new char[11];
-    strcpy(sendingId, id);
-
+GSource* setupFifoSource(int readingFd){
     GSource* fifoSource = g_unix_fd_source_new(readingFd, (GIOCondition)(G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL));
-    g_source_set_callback(fifoSource, G_SOURCE_FUNC(&fifoCallback), sendingId, NULL);
+    g_source_set_callback(fifoSource, G_SOURCE_FUNC(&fifoCallback), NULL, NULL);
     
     return fifoSource;
 }
@@ -413,8 +382,8 @@ void setupClosedWindowCallback(GtkWindow* window, GMainLoop* mainLoop){
 }
 
 
-void sendClosingMessage(const char* id){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11+sizeof(uid_t);
+void sendClosingMessage(){
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t);
 
     void* leavingMessage = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = leavingMessage;
@@ -425,9 +394,7 @@ void sendClosingMessage(const char* id){
     leavingMessage = (short*)leavingMessage + 1;
     *(short*)leavingMessage = 3;
     leavingMessage = (short*)leavingMessage + 1;
-    strcpy((char*)leavingMessage, id);
-    leavingMessage = (char*)leavingMessage + 11;
-    *(uid_t*)leavingMessage = getuid();
+    *(deviceid_t*)leavingMessage = (deviceid_t)getuid();
 
     int finalSuccess = write(writingFifo, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(finalSuccess);
@@ -436,14 +403,17 @@ void sendClosingMessage(const char* id){
 }
 
 void retrieveSavedMessages(){
+    //for future commits
+}
 
+const char* getOwnFifoPath(bool isReading){
+    deviceid_t id = (deviceid_t)getuid();
+    return getFifoPath(id, isReading);
 }
 
 int main(){
-    const char* id = retrieveId();
-
-    const char* readingFifoPath = getFifoPath(id, false);
-    const char* writingFifoPath = getFifoPath(id, true);
+    const char* readingFifoPath = getOwnFifoPath(false);
+    const char* writingFifoPath = getOwnFifoPath(true);
 
     
     writingFifo = open(writingFifoPath, O_WRONLY | O_NONBLOCK);
@@ -456,12 +426,11 @@ int main(){
     
     int readingFifo = openFifo(readingFifoPath, O_RDONLY | O_NONBLOCK);
 
-    sendOpenedMessage(id);
+    sendOpenedMessage();
 
-    GSource* fifoSource = setupFifoSource(readingFifo, id);
+    GSource* fifoSource = setupFifoSource(readingFifo);
     GMainContext* mainContext = g_main_context_default();
     g_source_attach(fifoSource, mainContext);
-
 
     GtkWindow* mainWindow = startGtk();
 
@@ -471,9 +440,9 @@ int main(){
 
     std::cout << "Entering loop\n";
     g_main_loop_run(mainLoop);
-
     //this is the end of the program, since g_main_loop_run has returned
-    sendClosingMessage(id);
+
+    sendClosingMessage();
 
     close(readingFifo);
     close(writingFifo);

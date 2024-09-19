@@ -93,7 +93,7 @@ void makeNewDeviceConnection(deviceid_t peerDeviceId, sockaddr_in* address){
 
     sendLocalContacts(newtcp.fd);
 
-    std::cout << "New TCP socket created with fd: " << newtcp.fd << '\n';
+    std::cout << "New TCP socket created with id: " << peerDeviceId << " and fd " << newtcp.fd << '\n';
 }
 
 void processUdpMessage(deviceid_t peerDeviceId, sockaddr_in* address){

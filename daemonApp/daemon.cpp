@@ -74,6 +74,7 @@ void checkForId(){
         int success = write(idFd, &deviceId, sizeof(deviceid_t));
         handleError(success);
     }
+    std::cout << "ID is " << deviceId << '\n';
     close(idFd);
     delete[] idPath;
 }
@@ -127,7 +128,7 @@ void translateUdp(){
 
     int udpSocket = toRead[1].fd; //second fd of polling vector is udp socket
     deviceid_t remoteDeviceId;
-    int success = recvfrom(udpSocket, (void*)&deviceId, sizeof(deviceId), 0, (sockaddr*)address, &size);//0 for flags
+    int success = recvfrom(udpSocket, (void*)&remoteDeviceId, sizeof(deviceid_t), 0, (sockaddr*)address, &size);//0 for flags
     handleError(success);
 
     processUdpMessage(remoteDeviceId, address);

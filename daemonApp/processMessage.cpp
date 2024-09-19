@@ -70,8 +70,8 @@ void sendContactRequest(deviceid_t id, deviceid_t peerId, bool isAccepting){
     message = (deviceid_t*)message + 1;
     *(deviceid_t*)message = peerId;
 
-    int remoteFd = remoteDevices[peerId & ~USER_PART];
-    std::cout << "Sending request contact message to fd: " << remoteFd << '\n';
+    int remoteFd = remoteDevices[peerId & (~USER_PART)];
+    std::cout << "Detected device id is " << (peerId & (~USER_PART)) << '\n';
 
     int success = write(remoteFd, toSend, sizeof(size_t) + sizeOfMsg);
     handleError(success);
@@ -189,8 +189,8 @@ void processFifo(void* message){
     short method = *(short*)message;
     message = (short*)message + 1;
 
-    deviceid_t id = (deviceid_t)(*(uid_t*)message);
-    message = (uid_t*)message+1;
+    deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
+    message = (deviceid_t*)message+1;
 
     if(method == 0){//app has opened
         initializeUser(id);
@@ -292,7 +292,7 @@ void processRemoteRequest(void* message){
 }
 
 void sendNewContactToLocals(deviceid_t peerId){
-    size_t sizeOfMsg = sizeof(short) + sizeof(deviceId);
+    size_t sizeOfMsg = sizeof(short) + sizeof(deviceid_t);
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
