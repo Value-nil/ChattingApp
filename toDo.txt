@@ -63,5 +63,7 @@ AFTER IT WORKS:
 
 
 BRANCH SPECIFIC OBJECTIVES:
--Make register message function on daemon
+-(DONE)Change id type to ull
+-(DONE)change elseifs to switch statements
+-(DONE)Make register message function on daemon
 -Make parsing message function on main app
