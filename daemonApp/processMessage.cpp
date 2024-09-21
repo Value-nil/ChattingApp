@@ -45,13 +45,17 @@ void sendCurrentOnlinePeers(int localFd){
 }
 
 
-void initializeUser(deviceid_t id){
+void initializeUser(void* message){
+    deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
+    message = (deviceid_t*)message+1;
+
     const char* fifoDir = getFifoPath(id, false);
     int localFd = openFifo(fifoDir, O_WRONLY);
 
     localUsers[id] = localFd;
 
     sendCurrentOnlinePeers(localFd);
+    std::cout << "App with id: " << id << " has opened\n";
 }
 
 void sendContactRequest(deviceid_t id, deviceid_t peerId, bool isAccepting){
@@ -184,48 +188,55 @@ const char* getMessageFilePath(deviceid_t userId, deviceid_t peerId){
     delete[] stringifiedPeerId;
     return fullPath;
 }
+void processLocalRequest(void* message){
+    deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
+    message = (deviceid_t*)message+1;
+    deviceid_t peerId = *(deviceid_t*)message;
+
+    deviceid_t request = buildRequest(id, peerId);
+
+    checkRequestingPeers(request, id, peerId);
+    std::cout << "Local user is requesting contact with another peer\n";
+}
+
+void sendMessageToRemote(void* message){
+    deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
+    message = (deviceid_t*)message+1;
+    deviceid_t peerId = *(deviceid_t*)message;
+    message = (deviceid_t*)message+1;
+
+    const char* messagePath = getMessageFilePath(id, peerId);
+
+    const char* actualMessage = (const char*)message;
+
+    sendMessage(id, peerId, actualMessage);
+    registerMessage(messagePath, actualMessage, true);
+
+    delete[] messagePath;
+    std::cout << "Local user is sending message!\n";
+}
+
+void closeApp(void* message){
+    deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
+    message = (deviceid_t*)message+1;
+
+    int success = close(localUsers[id]);
+    handleError(success);
+    localUsers[id] = 0;
+
+    restartUserFifos((uid_t)id);
+    std::cout << "Local user is closing app!\n";
+}
 
 void processFifo(void* message){
     short method = *(short*)message;
     message = (short*)message + 1;
 
-    deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
-    message = (deviceid_t*)message+1;
-
-    if(method == 0){//app has opened
-        initializeUser(id);
-        std::cout << "App with id: " << id << " has opened\n";
-    }
-    else if(method == 1){//local user requesting contact
-        //xor
-        deviceid_t peerId = *(deviceid_t*)message;
-
-        deviceid_t request = buildRequest(id, peerId);
-
-        checkRequestingPeers(request, id, peerId);
-        std::cout << "Local user is requesting contact with another peer\n";
-    }
-    else if(method == 2){//sending message
-	deviceid_t peerId = *(deviceid_t*)message;
-        message = (deviceid_t*)message+1;
-
-	const char* messagePath = getMessageFilePath(id, peerId);
-
-        const char* actualMessage = (const char*)message;
-
-        sendMessage(id, peerId, actualMessage);
-	registerMessage(messagePath, actualMessage, true);
-
-	delete[] messagePath;
-        std::cout << "Local user is sending message!\n";
-    }
-    else if(method == 3){//app is being closed
-        int success = close(localUsers[id]);
-        handleError(success);
-        localUsers[id] = 0;
-
-        restartUserFifos((uid_t)id);
-        std::cout << "Local user is closing app!\n";
+    switch(method){
+	case 0: initializeUser(message); break; //app has opened
+	case 1: processLocalRequest(message); break; //local contact requesting contact
+	case 2: sendMessageToRemote(message); break; //local contact sending message
+	case 3: closeApp(message); break; //local contact is closing app
     }
 }
 
@@ -358,22 +369,13 @@ void processTcp(void* message, int fd){
     short method = *(short*)message;
     message = (short*)message + 1;
 
-    if(method == 0){//peer tcp requesting contact
-        processRemoteRequest(message);
+    switch(method){
+	case 0: processRemoteRequest(message); break; //peer contact requesting contact
+	case 1: processPeerAcceptedContact(message); break; //peer contact accepted contact
+	case 2: processIncomingMessage(message); break; //new message from a peer contact
+	case 3: addNewRemoteContact(message); break; //new remote contact on subnet
+	case 4: removeRemoteContact(message); break; //remote contact is leaving
+	case 5: addRemoteDevice(message, fd); break; //remote device is sending its device id
     }
-    else if(method == 1){//peer tcp accepting contact
-        processPeerAcceptedContact(message);
-    }
-    else if(method == 2){//new message incoming
-        processIncomingMessage(message);
-    }
-    else if(method == 3){//add new contact (the device just joined)
-        addNewRemoteContact(message);
-    }
-    else if(method == 4){//remove remote contact(the device is going to leave)
-        removeRemoteContact(message);
-    }
-    else if(method == 5){//remote device is sending their deviceId
-	addRemoteDevice(message, fd);
-    }
+
 }
