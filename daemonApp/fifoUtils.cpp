@@ -16,15 +16,17 @@ extern pollVec toRead;
 const char* createFifo(deviceid_t id, bool isReading){
     const char* fullFifoPath = getFifoPath(id, isReading);
     std::cout << "Creating fifo on: " << fullFifoPath << '\n';
-    int success = mkfifo(fullFifoPath, S_IRWXU);
+
+    int success = mkfifo(fullFifoPath, isReading? S_IWUSR | S_IRUSR: S_IRUSR);
     handleError(success);
+    int success2 = chown(fullFifoPath, (uid_t)id, (gid_t)-1);
+    handleError(success2);
+
     return fullFifoPath;
 }
 
 
 void createUserFifos(uid_t userId){
-    seteuid(userId);
-
     //reading fifo
     const char* rFifoPath = createFifo((deviceid_t)userId, true);
     int readingFd = openFifo(rFifoPath, O_RDONLY | O_NONBLOCK);
@@ -37,8 +39,6 @@ void createUserFifos(uid_t userId){
 
     //writing fifo
     createFifo((deviceid_t)userId, false);
-
-    seteuid(getuid());
 }
 
 void removeUserFifos(uid_t id){

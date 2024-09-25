@@ -45,7 +45,7 @@ void createNewId(){
 }
 
 void createFifoDirectory(){
-    int success = mkdir(FIFO_PATH, S_IRWXU | S_IRWXG | S_IRWXO);
+    int success = mkdir(FIFO_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     handleError(success);
     cout << "Created fifo directory on /tmp\n";
 }
@@ -60,7 +60,7 @@ void checkForId(){
     checkIdDirectory();
     char* idPath = buildPath(ID_DIRECTORY_PATH, ID_PATH);
 
-    int idFd = open(idPath, O_CREAT | O_EXCL | O_WRONLY, S_IRWXU);
+    int idFd = open(idPath, O_CREAT | O_EXCL | O_WRONLY, S_IRUSR | S_IWUSR);
     if(idFd == -1 && errno == 17){
 	idFd = open(idPath, O_RDONLY);
 	handleError(idFd);

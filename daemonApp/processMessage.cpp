@@ -124,7 +124,7 @@ void checkRequestingPeers(deviceid_t request, deviceid_t id, deviceid_t peerId){
 
 
 void registerMessage(const char* messageFilePath, const char* message, bool localIsSender){
-    int fd = open(messageFilePath, O_WRONLY | O_CREAT | O_APPEND);
+    int fd = open(messageFilePath, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
     handleError(fd);
 
     size_t sizeOfEntry = sizeof(bool) + sizeof(time_t) + sizeof(char)*(strlen(message) + 1);
