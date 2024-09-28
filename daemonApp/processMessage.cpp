@@ -347,7 +347,8 @@ void addNewRemoteContact(void* message){
 
     if(userThatWasRequesting == 0)
         sendNewContactToLocals(peerId);
-    sendPeerToLocal(localUsers[userThatWasRequesting], peerId);
+    else
+    	sendPeerToLocal(localUsers[userThatWasRequesting], peerId);
 }
 
 void removeRemoteContact(void* message){
