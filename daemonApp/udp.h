@@ -4,5 +4,5 @@
 
 void sendNewDeviceNotification(int sock);
 void processUdpMessage(deviceid_t peerDeviceId, sockaddr_in* address);
-void sendLocalContacts(int socket);
+void sendLocalContacts(int socket, deviceid_t toSend);
 #endif

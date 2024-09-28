@@ -23,7 +23,8 @@ extern idToFd remoteDevices;
 extern deviceid_t deviceId;
 
 
-void sendCurrentOnlinePeers(int localFd){
+
+void sendPeerToLocal(int localFd, deviceid_t peerId){
     size_t sizeOfMsg = sizeof(short) + sizeof(deviceid_t);
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
@@ -33,17 +34,37 @@ void sendCurrentOnlinePeers(int localFd){
     message = (size_t*)message + 1;
     *(short*)message = 2;
     message = (short*)message + 1;
-    
-    for(auto iter = remoteDevices.begin(); iter != remoteDevices.end(); iter++){
-        std::cout << "Sending ID " << (*iter).first << " to local peer\n";
+    *(deviceid_t*)message = peerId;
 
-	*(deviceid_t*)message = (*iter).first;
-        int success = write(localFd, toSend, sizeof(size_t) + sizeOfMsg);
-        handleError(success);
-    }
+    std::cout << "Sending ID " << peerId << " to local peer\n";
+    int success = write(localFd, toSend, sizeof(size_t) + sizeOfMsg);
+    handleError(success);
+
     operator delete(toSend);
 }
+void requestRemoteContacts(deviceid_t id){
+    std::cout << "Requesting remote contacts!\n";
 
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t);
+
+    void* message = operator new(sizeof(size_t)+sizeOfMsg);
+    void* toSend = message;
+
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
+    *(short*)message = 1;
+    message = (short*)message + 1;
+    *(short*)message = 6;
+    message = (short*)message + 1;
+    *(deviceid_t*)message = id; //to resend and know what id you have to router to
+
+    for(auto iter = remoteDevices.begin(); iter != remoteDevices.end(); iter++){
+	int success = write((*iter).second, toSend, sizeof(size_t)+sizeOfMsg);
+	handleError(success);
+    }
+
+    operator delete(toSend);
+}
 
 void initializeUser(void* message){
     deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
@@ -54,7 +75,8 @@ void initializeUser(void* message){
 
     localUsers[id] = localFd;
 
-    sendCurrentOnlinePeers(localFd);
+    requestRemoteContacts(id);
+
     std::cout << "App with id: " << id << " has opened\n";
 }
 
@@ -228,6 +250,8 @@ void closeApp(void* message){
     std::cout << "Local user is closing app!\n";
 }
 
+
+
 void processFifo(void* message){
     short method = *(short*)message;
     message = (short*)message + 1;
@@ -303,34 +327,27 @@ void processRemoteRequest(void* message){
 }
 
 void sendNewContactToLocals(deviceid_t peerId){
-    size_t sizeOfMsg = sizeof(short) + sizeof(deviceid_t);
-
-    void* message = operator new(sizeof(size_t) + sizeOfMsg);
-    void* toSend = message;
-
-    *(size_t*)message = sizeOfMsg;
-    message = (size_t*)message + 1;
-    *(short*)message = 2;
-    message = (short*)message + 1;
-    *(deviceid_t*)message = peerId;
-
+    
     for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
         int fd = (*iter).second;
-        if(fd != 0){
-            int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
-            handleError(success);
-        } 
+        if(fd != 0)
+            sendPeerToLocal(fd, peerId);
 
         std::cout << "File descriptor for FIFO is: " << fd << '\n';
         std::cout << "The ID it is reffering to: " << (*iter).first << '\n';
     }
-
-    operator delete(toSend);
 }
 
 void addNewRemoteContact(void* message){
+    deviceid_t userThatWasRequesting = *(deviceid_t*)message;
+    message = (deviceid_t*)message + 1;
     deviceid_t peerId = *(deviceid_t*)message;
-    sendNewContactToLocals(peerId);
+    std::cout << "The user that was requesting is " << userThatWasRequesting << '\n';
+    std::cout << "The remote contact to add is " << peerId << '\n';
+
+    if(userThatWasRequesting == 0)
+        sendNewContactToLocals(peerId);
+    sendPeerToLocal(localUsers[userThatWasRequesting], peerId);
 }
 
 void removeRemoteContact(void* message){
@@ -361,8 +378,14 @@ void removeRemoteContact(void* message){
 void addRemoteDevice(void* message, int fd){
     deviceid_t remoteId = *(deviceid_t*)message;
     remoteDevices[remoteId] = fd;
-    sendLocalContacts(fd);
+    sendLocalContacts(fd, 0); //0 to represent sending for all remote peers
 }
+
+void sendLocalContactsToSpecificId(void* message, int fd){
+    deviceid_t peerId = *(deviceid_t*)message;
+    sendLocalContacts(fd, peerId);
+}
+
 
 //keep in mind IDs are reversed!
 void processTcp(void* message, int fd){
@@ -376,6 +399,7 @@ void processTcp(void* message, int fd){
 	case 3: addNewRemoteContact(message); break; //new remote contact on subnet
 	case 4: removeRemoteContact(message); break; //remote contact is leaving
 	case 5: addRemoteDevice(message, fd); break; //remote device is sending its device id
+	case 6: sendLocalContactsToSpecificId(message, fd); break; //remote contact has opened and is requesting device
     }
 
 }

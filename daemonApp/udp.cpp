@@ -30,8 +30,8 @@ void sendNewDeviceNotification(int sock){//sends a multicast message
     resetPeer(sock);
 }
 
-void sendLocalContacts(int socket){
-    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t);
+void sendLocalContacts(int socket, deviceid_t idToSend){
+    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t)*2;
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -42,6 +42,8 @@ void sendLocalContacts(int socket){
     message = (short*)message + 1;
     *(short*)message = 3;
     message = (short*)message + 1;
+    *(deviceid_t*)message = idToSend;
+    message = (deviceid_t*)message + 1;
 
     for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
 	*(deviceid_t*)message = deviceId | (deviceid_t)((*iter).first);
@@ -91,7 +93,7 @@ void makeNewDeviceConnection(deviceid_t peerDeviceId, sockaddr_in* address){
     remoteDevices[peerDeviceId] = newtcp.fd;
     toRead.push_back(newtcp);
 
-    sendLocalContacts(newtcp.fd);
+    sendLocalContacts(newtcp.fd, 0);
 
     std::cout << "New TCP socket created with id: " << peerDeviceId << " and fd " << newtcp.fd << '\n';
 }
