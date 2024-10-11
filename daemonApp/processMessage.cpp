@@ -286,19 +286,23 @@ void sendIncomingMessage(int localFd, deviceid_t peerId, const char* actualMessa
 
 
 void processIncomingMessage(void* message){
+    std::cout << "New incoming message\n";
     deviceid_t peerId = *(deviceid_t*)message;
     message = (deviceid_t*)message+1;
 
-    deviceid_t id = *(deviceid_t*)message;
+    deviceid_t id = *(deviceid_t*)message & USER_PART;//whenever local IDs come from the peer device, they come in full format(deviceid+userid)
     message = (deviceid_t*)message+1;
-
-    int localFd = localUsers[id & USER_PART];
-    if(localFd <= 0) return; //the user is offline
 
     const char* actualMessage = (const char*)message;
 
+    const char* messageFilePath = getMessageFilePath(id, peerId);
+    registerMessage(messageFilePath, actualMessage, false);
+    delete[] messageFilePath;
+
+    int localFd = localUsers[id];
+    if(localFd <= 0) return; //the user is offline
+
     sendIncomingMessage(localFd, peerId, actualMessage);
-    std::cout << "New incoming message\n";
 }
 
 void processPeerAcceptedContact(void* message){

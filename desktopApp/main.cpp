@@ -220,7 +220,35 @@ void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, deviceid_t peerId){
     g_signal_connect_after(inputTextBuffer, "insert-text", (GCallback)processCharacterInserted, peerIdAlloc);
 }
 
+void addNewContact(idToWidg &subnetPeers, deviceid_t peerId){
+    const char* stringifiedPeerId = stringifyId(peerId);
+    //building the conversation from xml file, making sure to setup everything
+    GtkBuilder* conversationBuilder = gtk_builder_new_from_file(XML_CONVERSATION_GUI_FILE);
 
+    GtkBox* conversationContainer = (GtkBox*)gtk_builder_get_object(conversationBuilder, "conversationContainer");
+    gtk_stack_add_titled(conversationContainerStack, (GtkWidget*)conversationContainer, stringifiedPeerId, stringifiedPeerId);
+
+    GtkBox* messageBox = (GtkBox*)gtk_builder_get_object(conversationBuilder, "messageBox");
+    messageBoxes[peerId] = messageBox;
+
+    GtkTextBuffer* inputTextBuffer = (GtkTextBuffer*)gtk_builder_get_object(conversationBuilder, "inputTextBuffer");
+    setupInsertTextCallback(inputTextBuffer, peerId);
+
+
+    removeSubnetPeer(subnetPeers[peerId]);
+    subnetPeers.erase(peerId);
+
+    std::cout << "Accepted new contact\n";
+}
+
+void displayIncomingMessage(deviceid_t peerId, const char* actualMessage){
+    GtkFrame* incomingMessage = newIncomingMessage((const char*)actualMessage);
+    gtk_box_append(messageBoxes[peerId], (GtkWidget*)incomingMessage);
+}
+
+void checkForMessages(){
+
+}
 
 void processMessage(void* message){
     static idToWidg subnetPeers; //includes non-accepted peers ONLY
@@ -245,9 +273,7 @@ void processMessage(void* message){
             {
                 char* actualMessage = new char[101];
                 strcpy(actualMessage, (const char*)message);
-
-                GtkFrame* incomingMessage = newIncomingMessage((const char*)actualMessage);
-                gtk_box_append(messageBoxes[peerId], (GtkWidget*)incomingMessage);
+		displayIncomingMessage(peerId, actualMessage);
 
                 std::cout << "New message\n";
 
@@ -258,31 +284,14 @@ void processMessage(void* message){
             //new device on subnet
             {
                 subnetPeers[peerId] = addNewSubnetPeer(peerId);
+		
                 std::cout << "New device on subnet\n";
                 break;
             }
         case 3:
             //someone accepted your connection
             {
-		const char* stringifiedPeerId = stringifyId(peerId);
-                //building the conversation from xml file, making sure to setup everything
-                GtkBuilder* conversationBuilder = gtk_builder_new_from_file(XML_CONVERSATION_GUI_FILE);
-
-                GtkBox* conversationContainer = (GtkBox*)gtk_builder_get_object(conversationBuilder, "conversationContainer");
-                gtk_stack_add_titled(conversationContainerStack, (GtkWidget*)conversationContainer, stringifiedPeerId, stringifiedPeerId);
-
-                GtkBox* messageBox = (GtkBox*)gtk_builder_get_object(conversationBuilder, "messageBox");
-                messageBoxes[peerId] = messageBox;
-
-                GtkTextBuffer* inputTextBuffer = (GtkTextBuffer*)gtk_builder_get_object(conversationBuilder, "inputTextBuffer");
-                setupInsertTextCallback(inputTextBuffer, peerId);
-
-
-                removeSubnetPeer(subnetPeers[peerId]);
-                subnetPeers.erase(peerId);
-
-                std::cout << "Accepted new contact\n";
-
+		addNewContact(subnetPeers, peerId);
                 break;
             }
 
