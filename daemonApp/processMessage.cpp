@@ -199,15 +199,13 @@ deviceid_t buildRequest(deviceid_t id, deviceid_t peerId){
 }
 
 const char* getMessageFilePath(deviceid_t userId, deviceid_t peerId){
-    struct passwd* passwdStruct = getpwuid((uid_t)userId);
-    const char* baseDirPath = buildPath(passwdStruct->pw_dir, INITIAL_DIR_PATH);
-    const char* messageDirPath = buildPath(baseDirPath, MESSAGES_PATH);
+    const char* messageDirPath = getMessageDirectoryPath(userId);
     const char* stringifiedPeerId = stringifyId(peerId);
     const char* fullPath = buildPath(messageDirPath, stringifiedPeerId);
 
-    delete[] baseDirPath;
     delete[] messageDirPath;
     delete[] stringifiedPeerId;
+
     return fullPath;
 }
 void processLocalRequest(void* message){

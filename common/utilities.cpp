@@ -52,4 +52,12 @@ int openFifo(const char* path, int mode){
     return fd;
 }
 
+const char* getMessageDirectoryPath(deviceid_t userId){
+    struct passwd* passwdStruct = getpwuid((uid_t)userId);
+    const char* baseDirPath = buildPath(passwdStruct->pw_dir, INITIAL_DIR_PATH);
+    const char* messageDirPath = buildPath(baseDirPath, MESSAGES_PATH);
+    delete[] baseDirPath;
+
+    return messageDirPath;
+}
 

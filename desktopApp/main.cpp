@@ -14,6 +14,7 @@
 #include <map>
 #include <mutex>
 #include <pwd.h>
+#include <dirent.h>
 
 #include "../common/utilities.h"
 #include "../common/constants.h"
@@ -246,8 +247,27 @@ void displayIncomingMessage(deviceid_t peerId, const char* actualMessage){
     gtk_box_append(messageBoxes[peerId], (GtkWidget*)incomingMessage);
 }
 
-void checkForMessages(){
+bool checkForMessages(deviceid_t peerId){
+    deviceid_t userId = (deviceid_t)getuid();
+    const char* stringifiedPeerId = stringifyId(peerId);
 
+    const char* messageDirPath = getMessageDirectoryPath(userId);
+    DIR* messageDir = opendir(messageDirPath);
+    if(messageDir == nullptr) handleError(-1);
+
+    bool fileExists = false;
+    errno = 0;
+    struct dirent* direc_ent = readdir(messageDir);
+    while(direc_ent != nullptr){
+	if(strcmp(direc_ent->d_name, stringifiedPeerId) == 0){
+	    fileExists = true;
+	    break;
+	}
+	direc_ent = readdir(messageDir);
+    }
+    if(errno != 0) handleError(-1);
+
+    return fileExists;
 }
 
 void processMessage(void* message){
@@ -284,6 +304,9 @@ void processMessage(void* message){
             //new device on subnet
             {
                 subnetPeers[peerId] = addNewSubnetPeer(peerId);
+		bool isContact = checkForMessages(peerId);
+		if(isContact)
+		    addNewContact(subnetPeers, peerId);
 		
                 std::cout << "New device on subnet\n";
                 break;
