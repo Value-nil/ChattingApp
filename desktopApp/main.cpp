@@ -30,6 +30,9 @@ const char* XML_MAIN_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/mainGui.x
 const char* XML_CONVERSATION_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/conversationContainerGui.xml";
 const char* XML_MESSAGE_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/message.xml";
 
+const int messageLimit = 1000;
+
+
 
 
 bool closeSecondaryRequest(GtkWindow* self, gpointer data){
@@ -200,7 +203,7 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
     std::cout << "length: " << len << '\n';
     if(text[0] == '\n'){
         char* fullText = getFullText(self);
-        if(strcmp(fullText, "") && strlen(fullText) <= 100){
+        if(strcmp(fullText, "") && strlen(fullText) <= messageLimit){
             gtk_text_buffer_set_text(self, "", 0);
             
 	    deviceid_t id = (deviceid_t)getuid();
