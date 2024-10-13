@@ -9,5 +9,6 @@ extern const char* ID_DIRECTORY_PATH;
 extern const char* INITIAL_DIR_PATH;
 extern const char* MESSAGES_PATH;
 extern const char* FIFO_PATH;
+extern const int messageLimit;
 
 #endif

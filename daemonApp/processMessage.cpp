@@ -169,7 +169,7 @@ void registerMessage(const char* messageFilePath, const char* message, bool loca
 }
 
 void sendMessage(deviceid_t id, deviceid_t peerId, const char* actualMessage){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2+sizeof(char)*101;
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2+sizeof(char)*(messageLimit+1);
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -263,7 +263,7 @@ void processFifo(void* message){
 }
 
 void sendIncomingMessage(int localFd, deviceid_t peerId, const char* actualMessage){
-    size_t sizeOfMsg = sizeof(short)+sizeof(deviceid_t)+sizeof(char)*101;
+    size_t sizeOfMsg = sizeof(short)+sizeof(deviceid_t)+sizeof(char)*(messageLimit+1);
 
     void* message = operator new(sizeof(size_t)+ sizeOfMsg);
     void* toSend = message;

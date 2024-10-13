@@ -30,7 +30,6 @@ const char* XML_MAIN_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/mainGui.x
 const char* XML_CONVERSATION_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/conversationContainerGui.xml";
 const char* XML_MESSAGE_GUI_FILE = "/usr/local/share/chattingApp/guiFiles/message.xml";
 
-const int messageLimit = 1000;
 
 
 
@@ -177,7 +176,7 @@ char* getFullText(GtkTextBuffer* buffer){
 
 
 void sendMessage(deviceid_t id, deviceid_t peerId, const char* fullText){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2+sizeof(char)*(messageLimit+1);
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2+sizeof(char)*(strlen(fullText)+1);
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;

@@ -6,4 +6,4 @@ const char* ID_DIRECTORY_PATH = "/var/local/lib/misc"; //the directory the id fi
 const char* INITIAL_DIR_PATH = "/.chatting_app";
 const char* MESSAGES_PATH = "/messages/";
 const char* FIFO_PATH = "/tmp/chattingApp/";
-
+const int messageLimit = 1000; 
