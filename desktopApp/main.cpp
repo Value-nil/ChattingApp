@@ -177,7 +177,7 @@ char* getFullText(GtkTextBuffer* buffer){
 
 
 void sendMessage(deviceid_t id, deviceid_t peerId, const char* fullText){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2+sizeof(char)*101;
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t)*2+sizeof(char)*(messageLimit+1);
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -294,7 +294,7 @@ void processMessage(void* message){
         case 1:
             //new message
             {
-                char* actualMessage = new char[101];
+                char* actualMessage = new char[messageLimit+1];
                 strcpy(actualMessage, (const char*)message);
 		displayIncomingMessage(peerId, actualMessage);
 
