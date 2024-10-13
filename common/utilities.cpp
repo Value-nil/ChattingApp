@@ -39,7 +39,7 @@ const char* getFifoPath(deviceid_t id, bool isAppToD){
 }
 
 char* buildPath(const char* basePath, const char* relativePath){
-    char* fullPath = new char[strlen(basePath) + strlen(relativePath)];
+    char* fullPath = new char[strlen(basePath) + strlen(relativePath) + 1];//1 for the null pointer
     strcpy(fullPath, basePath);
     strcat(fullPath, relativePath);
 
