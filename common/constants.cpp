@@ -7,3 +7,4 @@ const char* INITIAL_DIR_PATH = "/.chatting_app";
 const char* MESSAGES_PATH = "/messages/";
 const char* FIFO_PATH = "/tmp/chattingApp/";
 const int messageLimit = 1000; 
+const size_t metadataSize = sizeof(bool) + sizeof(time_t) + sizeof(int);

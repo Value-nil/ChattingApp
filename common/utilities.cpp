@@ -60,4 +60,13 @@ const char* getMessageDirectoryPath(deviceid_t userId){
 
     return messageDirPath;
 }
+const char* getMessageFilePath(deviceid_t userId, deviceid_t peerId){
+    const char* messageDirPath = getMessageDirectoryPath(userId);
+    const char* stringifiedPeerId = stringifyId(peerId);
+    const char* fullPath = buildPath(messageDirPath, stringifiedPeerId);
 
+    delete[] messageDirPath;
+    delete[] stringifiedPeerId;
+
+    return fullPath;
+}

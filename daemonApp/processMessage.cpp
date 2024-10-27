@@ -149,7 +149,7 @@ void registerMessage(const char* messageFilePath, const char* message, bool loca
     int fd = open(messageFilePath, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
     handleError(fd);
 
-    size_t sizeOfEntry = sizeof(bool) + sizeof(time_t) + sizeof(char)*(strlen(message) + 1);
+    size_t sizeOfEntry = metadataSize + sizeof(char)*(strlen(message));
     void* entry = operator new(sizeOfEntry);
     void* toStore = entry;
     
@@ -157,8 +157,9 @@ void registerMessage(const char* messageFilePath, const char* message, bool loca
     entry = (bool*)entry + 1;
     time((time_t*)entry);
     entry = (time_t*)entry + 1;
+    *(int*)entry = strlen(message);
     strcpy((char*)entry, message);
-    *((char*)entry + strlen(message)) = '\n'; //setting new line for separating from other entries
+    //*((char*)entry + strlen(message)) = '\0'; //setting new line for separating from other entries
     
     int success = write(fd, toStore, sizeOfEntry);
     handleError(success);
@@ -198,16 +199,7 @@ deviceid_t buildRequest(deviceid_t id, deviceid_t peerId){
     return (id & USER_PART)^peerId;
 }
 
-const char* getMessageFilePath(deviceid_t userId, deviceid_t peerId){
-    const char* messageDirPath = getMessageDirectoryPath(userId);
-    const char* stringifiedPeerId = stringifyId(peerId);
-    const char* fullPath = buildPath(messageDirPath, stringifiedPeerId);
 
-    delete[] messageDirPath;
-    delete[] stringifiedPeerId;
-
-    return fullPath;
-}
 void processLocalRequest(void* message){
     deviceid_t id = *(deviceid_t*)message;//this is only the user id part!
     message = (deviceid_t*)message+1;

@@ -15,6 +15,7 @@
 #include <mutex>
 #include <pwd.h>
 #include <dirent.h>
+#include <time.h>
 
 #include "../common/utilities.h"
 #include "../common/constants.h"
@@ -197,6 +198,10 @@ void sendMessage(deviceid_t id, deviceid_t peerId, const char* fullText){
 
     operator delete(toSend);
 }
+void displaySentMessage(deviceid_t peerId, const char* message){
+    GtkFrame* messageFrame = newSentMessage((const char*)message);
+    gtk_box_append(messageBoxes[peerId], (GtkWidget*)messageFrame);
+}
 
 void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
     std::cout << "length: " << len << '\n';
@@ -209,10 +214,7 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
             deviceid_t peerId = *(deviceid_t*)user_data;
 
 	    sendMessage(id, peerId, fullText);
-
-            GtkFrame* messageFrame = newSentMessage((const char*)fullText);
-            gtk_box_append(messageBoxes[peerId], (GtkWidget*)messageFrame);
-        }
+	}
     }
 }
 
@@ -221,6 +223,45 @@ void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, deviceid_t peerId){
     deviceid_t* peerIdAlloc = new deviceid_t;
     *peerIdAlloc = peerId;
     g_signal_connect_after(inputTextBuffer, "insert-text", (GCallback)processCharacterInserted, peerIdAlloc);
+}
+
+void displayIncomingMessage(deviceid_t peerId, const char* actualMessage){
+    GtkFrame* incomingMessage = newIncomingMessage((const char*)actualMessage);
+    gtk_box_append(messageBoxes[peerId], (GtkWidget*)incomingMessage);
+}
+
+void retrieveMessages(deviceid_t peerId){
+    const char* messageFilePath = getMessageFilePath((deviceid_t)getuid(), peerId);
+    int fd = open(messageFilePath, O_RDONLY);
+    handleError(fd);
+
+    void* metadata = operator new(metadataSize);
+    void* toRemove = metadata;
+    int bytesRead = read(fd, metadata, metadataSize);
+    handleError(bytesRead);
+    while(bytesRead != 0){
+	bool localSentMessage = *(bool*)metadata;
+	metadata = (bool*)metadata + 1;
+	//the time won't be use for now
+	metadata = (time_t*)metadata + 1;
+	int messageSize = *(int*)metadata;
+
+	char* message = new char[messageSize+1];
+	int success = read(fd, message, messageSize);
+	handleError(success);
+
+	message[messageSize] = '\0';
+	if(localSentMessage)
+	    displaySentMessage(peerId, (const char*)message);
+	else
+	    displayIncomingMessage(peerId, (const char*)message);
+	delete[] message;
+
+	metadata = toRemove;
+	int bytesRead = read(fd, metadata, metadataSize);
+        handleError(bytesRead);
+    }
+    operator delete(toRemove);
 }
 
 void addNewContact(idToWidg &subnetPeers, deviceid_t peerId){
@@ -239,15 +280,13 @@ void addNewContact(idToWidg &subnetPeers, deviceid_t peerId){
 
 
     removeSubnetPeer(subnetPeers[peerId]);
+    retrieveMessages(peerId);
     subnetPeers.erase(peerId);
 
     std::cout << "Accepted new contact\n";
 }
 
-void displayIncomingMessage(deviceid_t peerId, const char* actualMessage){
-    GtkFrame* incomingMessage = newIncomingMessage((const char*)actualMessage);
-    gtk_box_append(messageBoxes[peerId], (GtkWidget*)incomingMessage);
-}
+
 
 bool checkForMessages(deviceid_t peerId){
     deviceid_t userId = (deviceid_t)getuid();
