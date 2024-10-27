@@ -239,7 +239,7 @@ void retrieveMessages(deviceid_t peerId){
     void* toRemove = metadata;
     int bytesRead = read(fd, metadata, metadataSize);
     handleError(bytesRead);
-    while(bytesRead != 0){
+    while(bytesRead > 0){
 	bool localSentMessage = *(bool*)metadata;
 	metadata = (bool*)metadata + 1;
 	//the time won't be use for now
@@ -258,7 +258,7 @@ void retrieveMessages(deviceid_t peerId){
 	delete[] message;
 
 	metadata = toRemove;
-	int bytesRead = read(fd, metadata, metadataSize);
+	bytesRead = read(fd, metadata, metadataSize);
         handleError(bytesRead);
     }
     operator delete(toRemove);
