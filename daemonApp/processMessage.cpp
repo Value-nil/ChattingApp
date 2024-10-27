@@ -106,6 +106,10 @@ void sendContactRequest(deviceid_t id, deviceid_t peerId, bool isAccepting){
 }
 
 void processAcceptContact(deviceid_t peerId, deviceid_t id){
+    const char* messageFilePath = getMessageFilePath(id, peerId);
+    int success2 = creat(messageFilePath, S_IRWXU | S_IROTH);
+    handleError(success2);
+
     size_t sizeOfMsg = sizeof(short) + sizeof(deviceid_t);
 
     void* message = operator new(sizeof(size_t)+sizeOfMsg);
