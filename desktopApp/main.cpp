@@ -214,6 +214,7 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
             deviceid_t peerId = *(deviceid_t*)user_data;
 
 	    sendMessage(id, peerId, fullText);
+	    displaySentMessage(peerId, fullText);
 	}
     }
 }
@@ -251,6 +252,7 @@ void retrieveMessages(deviceid_t peerId){
 	handleError(success);
 
 	message[messageSize] = '\0';
+	std::cout << message << '\n';
 	if(localSentMessage)
 	    displaySentMessage(peerId, (const char*)message);
 	else
@@ -260,6 +262,7 @@ void retrieveMessages(deviceid_t peerId){
 	metadata = toRemove;
 	bytesRead = read(fd, metadata, metadataSize);
         handleError(bytesRead);
+	std::cout << bytesRead << '\n';
     }
     operator delete(toRemove);
 }

@@ -153,6 +153,9 @@ void registerMessage(const char* messageFilePath, const char* message, bool loca
     int fd = open(messageFilePath, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
     handleError(fd);
 
+    int findSuccess = lseek(fd, 0, SEEK_END);
+    handleError(findSuccess);
+
     size_t sizeOfEntry = metadataSize + sizeof(char)*(strlen(message));
     void* entry = operator new(sizeOfEntry);
     void* toStore = entry;
@@ -162,8 +165,8 @@ void registerMessage(const char* messageFilePath, const char* message, bool loca
     time((time_t*)entry);
     entry = (time_t*)entry + 1;
     *(int*)entry = strlen(message);
-    strcpy((char*)entry, message);
-    //*((char*)entry + strlen(message)) = '\0'; //setting new line for separating from other entries
+    entry = (int*)entry + 1;
+    strncpy((char*)entry, message, strlen(message));
     
     int success = write(fd, toStore, sizeOfEntry);
     handleError(success);
@@ -171,6 +174,7 @@ void registerMessage(const char* messageFilePath, const char* message, bool loca
     operator delete(toStore);
     close(fd);
 
+    std::cout << "Registered message\n";
 }
 
 void sendMessage(deviceid_t id, deviceid_t peerId, const char* actualMessage){
