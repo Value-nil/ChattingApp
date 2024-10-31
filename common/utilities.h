@@ -4,7 +4,7 @@
 #include "types.h"
 
 char* stringifyId(deviceid_t id);
-deviceid_t unstringifyId(char* id);
+deviceid_t unstringifyId(const char* id);
 void handleError(int returnInt);
 const char* getFifoPath(deviceid_t id, bool isAppToD);
 char* buildPath(const char* basePath, const char* relativePath);

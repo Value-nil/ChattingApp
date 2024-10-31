@@ -365,19 +365,34 @@ void processMessage(void* message){
         case 4:
             //left device
             {
-                removeSubnetPeer(subnetPeers[peerId]);
-                subnetPeers.erase(peerId);
+		//Daemon is sending device id only
+		for(auto iter = subnetPeers.begin(); iter != subnetPeers.end(); iter++){
+		    deviceid_t actualPeerId = (*iter).first;
+		    if((actualPeerId & ~USER_PART) == peerId){
+			removeSubnetPeer(subnetPeers[actualPeerId]);
+			subnetPeers.erase(actualPeerId);
+		    }
+		    std::cout << "A contact has left: " << actualPeerId << "\n";
+		}
 
-		const char* stringifiedPeerId = stringifyId(peerId);
+		GListModel* peerList = (GListModel*)gtk_stack_get_pages(conversationContainerStack);
+		GtkStackPage* stackPage = (GtkStackPage*)g_list_model_get_item(peerList, 0);
+		//for(int i = 1; stackPage != NULL; stackPage = (GtkStackPage*)g_list_model_get_item(peerList, i++)){
+		int i = 1;
+		while(stackPage != NULL){
+		    const char* stringifiedPeerId = gtk_stack_page_get_name(stackPage);
+		    deviceid_t actualPeerId = unstringifyId(stringifiedPeerId);
 
-                GtkWidget* conversationContainer = gtk_stack_get_child_by_name(conversationContainerStack, stringifiedPeerId);
-                if(conversationContainer != NULL){
-                    gtk_stack_remove(conversationContainerStack, conversationContainer);
-                }
+		    GtkWidget* conversationContainer = gtk_stack_get_child_by_name(conversationContainerStack, stringifiedPeerId);
+		    if(conversationContainer != NULL){
+			gtk_stack_remove(conversationContainerStack, conversationContainer);
+		    }
 
-		messageBoxes.erase(peerId);
+		    messageBoxes.erase(actualPeerId);
+		    std::cout << "A contact has left: " << actualPeerId << "\n";
 
-                std::cout << "A contact has left\n";
+		    stackPage = (GtkStackPage*)g_list_model_get_item(peerList, i++);
+		}
 
                 break;
             }
