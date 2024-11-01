@@ -1,10 +1,11 @@
 #include <stddef.h>
 #include "constants.h"
 
-const char* ID_PATH = "/id.txt";
-const char* D_TO_A_PATH = "/d_to_a_fifo";//daemon to app fifo
-const char* A_TO_D_PATH = "/a_to_d_fifo";//app to daemon fifo
+const char* ID_PATH = "/chattingappid"; //path to store the device id in
+const char* ID_DIRECTORY_PATH = "/var/local/lib/misc"; //the directory the id file is stored in
 const char* INITIAL_DIR_PATH = "/.chatting_app";
-const char* MESSAGES_PATH = "/messages";
+const char* MESSAGES_PATH = "/messages/";
 const char* FIFO_PATH = "/tmp/chattingApp/";
-
+const int messageLimit = 1000; 
+const size_t metadataSize = sizeof(bool) + sizeof(time_t) + sizeof(int);
+const deviceid_t USER_PART = 0x00000000ffffffff;

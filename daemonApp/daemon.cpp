@@ -27,81 +27,62 @@
 
 
 pollVec toRead; //for poll; includes readable socket fds
-chVec requestedPeers;//indicates peers that requested contacting with another peer
-chVec localIDs;//IDs from this device
-chVec remoteIDs;//IDs from peers that are online
-chToInt localUsers; //local user id to fifo fd
-chToInt remoteUsers; //remote user id to writeable socket fd
-addrToFd addressToFd;//from addresses to (possible)file descriptors
+idVec requestedPeers;//indicates peers that requested contacting with another peer
+idToFd localUsers; //local user id to fifo fd
+idToFd remoteDevices; //remote device id to writeable socket fd
+deviceid_t deviceId;//an id unique for each device
 
 
 using namespace std;
 
 
 
-char* newId(){
-    char* id = new char[11];
-    const char* possibleCharacters = "1234567890";
-
-    void* randomNums = operator new(sizeof(unsigned short)*10);
-    int success = getrandom(randomNums, sizeof(unsigned short)*10, 0);
+void createNewId(){
+    int success = getrandom(&deviceId, sizeof(deviceid_t), 0);
     handleError(success);
 
-    for(int i = 0; i < 10; i++){
-        *(id+i) = possibleCharacters[(*(unsigned short*)randomNums) % 10];
-        randomNums = (unsigned short*)randomNums + 1;
-    }
-    randomNums = (unsigned short*)randomNums - 10;
-    id[10] = '\0';
-
-    operator delete(randomNums);
-
-    return id;
-}
-
-char* retrieveId(char* idPath){
-    char* id = new char[11];
-
-    int idFd = open(idPath, O_RDONLY);
-    handleError(idFd);
-
-    int success = read(idFd, id, sizeof(char)*11);
-    handleError(success);
-
-    return id;
+    deviceId = deviceId & (~USER_PART); //the upper half is used for the device id; the lower part is used for the user id
 }
 
 void createFifoDirectory(){
-    int success = mkdir(FIFO_PATH, 0777);
-    cout << "Created fifo directory on /tmp\n";
+    int success = mkdir(FIFO_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     handleError(success);
+    cout << "Created fifo directory on /tmp\n";
 }
 
+void checkIdDirectory(){
+    int success = mkdir(ID_DIRECTORY_PATH, S_IRWXU);
+    if(success == -1 && errno != EEXIST)
+	handleError(-1);
+}
 
+void checkForId(){
+    checkIdDirectory();
+    char* idPath = buildPath(ID_DIRECTORY_PATH, ID_PATH);
 
-char* checkForId(char* initialDirPath){
-    char* idPath = buildPath(initialDirPath, ID_PATH);
-
-    int idFd = open(idPath, O_CREAT | O_EXCL | O_WRONLY, ACCESS_MODE);
-    char* id;
+    int idFd = open(idPath, O_CREAT | O_EXCL | O_WRONLY, S_IRUSR | S_IWUSR);
     if(idFd == -1 && errno == 17){
-        id = retrieveId(idPath);
+	idFd = open(idPath, O_RDONLY);
+	handleError(idFd);
+
+	int success = read(idFd, &deviceId, sizeof(deviceid_t));
+	handleError(success);
     }
     else if(idFd == -1) handleError(idFd);
     else{
-        id = newId();
-        int success = write(idFd, id, sizeof(char)*11);
+	createNewId();
+        int success = write(idFd, &deviceId, sizeof(deviceid_t));
         handleError(success);
     }
+    std::cout << "ID is " << deviceId << '\n';
     close(idFd);
     delete[] idPath;
-    return id;
 }
 
 void createMsgDir(char* initialDirPath){
     char* messagesDirPath = buildPath(initialDirPath, MESSAGES_PATH);
 
-    int messagesDirSuccess = mkdir(messagesDirPath, ACCESS_MODE);
+    int messagesDirSuccess = mkdir(messagesDirPath, S_IRWXU);
     if(messagesDirSuccess == -1 && errno != 17){
         handleError(-1);
     }
@@ -113,7 +94,7 @@ void createMsgDir(char* initialDirPath){
 char* createInitialDir(passwd* user){
     char* path = buildPath(user->pw_dir, INITIAL_DIR_PATH);
 
-    int mkdirSuccess = mkdir(path, ACCESS_MODE);
+    int mkdirSuccess = mkdir(path, S_IRWXU);
     if(mkdirSuccess == -1 && errno != 17){
         handleError(-1);
     }
@@ -126,10 +107,8 @@ void setupUserDirectory(passwd* user){
 
     char* initialDirPath = createInitialDir(user);
 
-    const char* id = checkForId(initialDirPath);
-    localIDs.push_back(id);
-    std::cout << "Initializing " << id << " directory\n";
-    createUserFifos(id, user->pw_uid);
+    localUsers[(deviceid_t)user->pw_uid] = 0;
+    createUserFifos(user->pw_uid);
 
     createMsgDir(initialDirPath);
 
@@ -148,11 +127,11 @@ void translateUdp(){
     socklen_t size = sizeof(sockaddr_in);
 
     int udpSocket = toRead[1].fd; //second fd of polling vector is udp socket
-    char a;
-    int success = recvfrom(udpSocket, (void*)&a, sizeof(char), 0, (sockaddr*)address, &size);//0 for flags
+    deviceid_t remoteDeviceId;
+    int success = recvfrom(udpSocket, (void*)&remoteDeviceId, sizeof(deviceid_t), 0, (sockaddr*)address, &size);//0 for flags
     handleError(success);
 
-    processUdpMessage(address);
+    processUdpMessage(remoteDeviceId, address);
 
     delete address;
 }
@@ -161,27 +140,17 @@ void translateListeningTcp(){
     pollfd newConnection;
     int listeningTcpSocket = toRead[0].fd;    //first fd of polling vector is listening tcp
 
-    sockaddr_in* newPeer = new sockaddr_in;
-    socklen_t size = sizeof(sockaddr_in);
-    newConnection.fd = accept(listeningTcpSocket, (sockaddr*)newPeer, &size);
+    newConnection.fd = accept(listeningTcpSocket, nullptr, nullptr);
     newConnection.events = POLLIN;
-
-    cout << "Address of peer: " << inet_ntoa(newPeer->sin_addr) << '\n';
-
     handleError(newConnection.fd);
-                    
+ 
     toRead.push_back(newConnection);
-    addressToFd[newPeer->sin_addr] = newConnection.fd;//for other users a device might have
 
-    sendLocalContacts(newConnection.fd);
-
-    cout << "Accepted new TCP socket: " << newConnection.fd;
-
-    delete newPeer;
+    cout << "Accepted new TCP socket: " << newConnection.fd << '\n';
 }
 
 
-void checkUsers(pollfd udpSocket){
+void checkUsers(){
     passwd* user = getpwent();
     while(user != nullptr){
         if(user->pw_uid >= 1000 && user->pw_uid <= 59999){//checking for actually created users
@@ -193,6 +162,10 @@ void checkUsers(pollfd udpSocket){
         if(errno != 0){
             handleError(-1);
         }
+    }
+    if(localUsers.size() == 0){
+	cerr << "No users created on the system, exiting\n";
+	exit(EXIT_FAILURE);
     }
 }
 
@@ -215,17 +188,12 @@ void processNewData(int fd, size_t msgSize){
 }
 
 void deleteAddress(int fd){
-    sockaddr_in* leavingAddr = new sockaddr_in;
-    socklen_t size = sizeof(sockaddr_in);
-
-    int peerNameSuccess = getpeername(fd, (sockaddr*)leavingAddr, &size);
-    handleError(peerNameSuccess);
-
-    addressToFd.erase(leavingAddr->sin_addr);
-        
-    cout << "Leaving address: " << inet_ntoa(leavingAddr->sin_addr) << '\n';
-
-    delete leavingAddr;
+    for(auto iter = remoteDevices.begin(); iter != remoteDevices.end(); iter++){
+	if((*iter).second == fd){
+	    remoteDevices.erase((*iter).first);
+	    break;
+	}
+    }
 }
 
 
@@ -239,9 +207,8 @@ void processNormalPolling(int index){
     if(success > 0){
         processNewData(fd, msgSize);
     }
-    else{
+    else{//tcp sends empty messages indicating leaving
         cout << "Peer is leaving!\n";
-
         deleteAddress(fd);
         
         int closingSuccess = close(fd);
@@ -252,7 +219,7 @@ void processNormalPolling(int index){
 
 
 void sendClosingMessage(int signal){
-    size_t sizeOfMsg = sizeof(short)*2+sizeof(char)*11;
+    size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t);
 
     void* closingMessage = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = closingMessage;
@@ -263,17 +230,15 @@ void sendClosingMessage(int signal){
     closingMessage = (short*)closingMessage + 1;
     *(short*)closingMessage = 4;
     closingMessage = (short*)closingMessage + 1;
+    *(deviceid_t*)closingMessage = deviceId;
 
     cout << "Stopping app\n" << flush;
 
-    for(unsigned int i = 0; i < localIDs.size(); i++){
-        strcpy((char*)closingMessage, localIDs[i]);
-        for(auto j = addressToFd.begin(); j != addressToFd.end(); j++){
-            int fd = (*j).second;
-            if(fd != 0){
-                int success = write(fd, toSend, sizeof(size_t)+ sizeOfMsg);
-                handleError(success);
-            }
+    for(auto j = remoteDevices.begin(); j != remoteDevices.end(); j++){
+        int fd = (*j).second;
+        if(fd != 0){
+            int success = write(fd, toSend, sizeof(size_t)+ sizeOfMsg);
+            handleError(success);
         }
     }
 
@@ -299,9 +264,9 @@ int main(){
     pollfd udpSocket = newudpSocket();
     toRead.push_back(udpSocket);
 
-
+    checkForId();
     createFifoDirectory();
-    checkUsers(udpSocket);
+    checkUsers();
     sendNewDeviceNotification(udpSocket.fd);
     connectTermSignal();
 
@@ -318,8 +283,6 @@ int main(){
             if(revents != 0){
                 cout << toRead[i].fd << " fd polled\n";
             }
-
-
             if((revents & POLLIN) == POLLIN){
                 //for detecting listening tcp and udp, respectively
                 if(i == 0){
@@ -333,9 +296,6 @@ int main(){
                 else{
                     processNormalPolling(i);
                 }
-
-
-                
             }
             if((revents & POLLHUP) == POLLHUP){
                 close(toRead[i].fd);
@@ -354,13 +314,5 @@ int main(){
         cout << "----------------------------\n";
         cout << std::flush;
     }
-
-
-    for(unsigned int i = 0; i < toRead.size(); i++){
-        int success = close(toRead[i].fd);
-        handleError(success);
-    }
-    
-    
     return 0;
 }

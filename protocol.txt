@@ -15,4 +15,5 @@ Daemon to daemon tcp:
 2: new incoming message
 3: new contact
 4: contact leaving
-5: device leaving
+5: device sending ID
+6: remote ID has opened and is requesting local contacts

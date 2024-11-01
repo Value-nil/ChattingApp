@@ -60,4 +60,12 @@ AFTER IT WORKS:
 -Implementing messages and contacts saving
 -Tell FIFO about new contacts that are requesting(not a priority)
     --Handle someone requesting your contact(send notification)
+-Make a syncronization mechanism to allow sending message(not contact request) even when the peer user is offline
 
+
+BRANCH SPECIFIC OBJECTIVES:
+-(DONE)Change id type to ull
+-(DONE)change elseifs to switch statements
+-(DONE)Make register message function on daemon
+-Make parsing message function on main app
+-Make dynamic message length for daemon-daemon messages

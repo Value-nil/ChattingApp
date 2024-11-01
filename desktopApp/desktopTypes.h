@@ -4,10 +4,10 @@
 #include <map>
 #include <gtk/gtk.h>
 
-#include "../common/cmpFuncs.h"
+#include "../common/types.h"
 
 
-typedef std::map<const char*, GtkWidget*, cmp_str> chToWidg; 
-typedef std::map<const char*, GtkBox*, cmp_str> chToBox;
+typedef std::map<deviceid_t, GtkWidget*> idToWidg; 
+typedef std::map<deviceid_t, GtkBox*> idToBox;
 
 #endif

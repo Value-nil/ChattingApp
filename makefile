@@ -1,7 +1,7 @@
 VPATH = daemonApp common desktopApp desktopApp/guiFiles
 
-DAEMON_TARGETS ::= cmpFuncs.o daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o fifoUtils.o
-MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o cmpFuncs.o
+DAEMON_TARGETS ::= daemon.o daemonConstants.o processMessage.o socketUtils.o udp.o utilities.o constants.o fifoUtils.o
+MAIN_APP_TARGETS ::= mainApp.o utilities.o constants.o 
 GUI_FILES_TARGETS ::= conversationContainerGui.xml mainGui.xml message.xml
 
 CC ::= g++
@@ -15,23 +15,22 @@ GUI_FILES_LOCATION ::= $(PREFIX)/share/chattingApp/guiFiles
 DAEMON_LOCATION ::= $(PREFIX)/sbin
 MAIN_APP_LOCATION ::= $(PREFIX)/bin
 UNIT_FILE_LOCATION ::= $(PREFIX)/lib/systemd/system
+ID_DIRECTORY_PATH ::= /var/local/lib/misc
 
 all: chattingappd chattingApp
 
 chattingappd: $(DAEMON_TARGETS)
 	$(CC) $(DAEMON_TARGETS) $(LDFLAGS) -o chattingappd
 
-cmpFuncs.o: cmpFuncs.cpp cmpFuncs.h
-
-daemon.o: daemon.cpp cmpFuncs.o udp.o processMessage.o daemonConstants.o socketUtils.o utilities.o constants.o daemonTypes.h fifoUtils.o
+daemon.o: daemon.cpp udp.o processMessage.o daemonConstants.o socketUtils.o utilities.o constants.o daemonTypes.h fifoUtils.o
 
 daemonConstants.o: daemonConstants.cpp daemonConstants.h 
 
-processMessage.o: processMessage.cpp processMessage.h cmpFuncs.o utilities.o constants.o daemonConstants.o daemonTypes.h fifoUtils.o
+processMessage.o: processMessage.cpp processMessage.h utilities.o constants.o daemonConstants.o daemonTypes.h fifoUtils.o
 
 socketUtils.o: socketUtils.cpp socketUtils.h utilities.o daemonConstants.o
 
-udp.o: udp.cpp udp.h utilities.o cmpFuncs.o socketUtils.o daemonConstants.o daemonTypes.h
+udp.o: udp.cpp udp.h utilities.o socketUtils.o daemonConstants.o daemonTypes.h
 
 utilities.o: utilities.cpp utilities.h constants.o
 
@@ -59,10 +58,14 @@ $(GUI_FILES_LOCATION)/%.xml: desktopApp/guiFiles/%.xml
 
 
 
-daemon_install: $(DAEMON_LOCATION)/chattingappd $(UNIT_FILE_LOCATION)/chattingappd.service
+daemon_install: $(ID_DIRECTORY_PATH) $(DAEMON_LOCATION)/chattingappd $(UNIT_FILE_LOCATION)/chattingappd.service
+
+$(ID_DIRECTORY_PATH):
+	mkdir -p $(ID_DIRECTORY_PATH)
 
 $(DAEMON_LOCATION)/chattingappd : chattingappd
-	cp chattingappd $(DAEMON_LOCATION) 
+	-systemctl stop chattingappd.service
+	cp chattingappd $(DAEMON_LOCATION)
 	
 $(UNIT_FILE_LOCATION)/chattingappd.service : chattingappd.service $(DAEMON_LOCATION)/chattingappd
 	mkdir $(UNIT_FILE_LOCATION) -p
