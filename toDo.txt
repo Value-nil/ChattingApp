@@ -53,19 +53,13 @@ AFTER IT WORKS:
 -(DONE)Handle instalation of app
 -(DONE)Consider changing protocol for dedicating a number to peer leaving(contact, not device)
 -(DONE)Make a debug log
+-(DONE)Implementing messages and contacts saving
 
 -Add .desktop file
--Fix messages sometimes occupying all of the box space
+-Make all functions static and inline where applicable
 -When processing input text, take into account newline insertions in locations that are different from end of string
--Implementing messages and contacts saving
+
+-Fix messages sometimes occupying all of the box space
+-Make a syncronization mechanism to allow sending message(not contact request) even when the peer user is offline(NEW BRANCH)
 -Tell FIFO about new contacts that are requesting(not a priority)
     --Handle someone requesting your contact(send notification)
--Make a syncronization mechanism to allow sending message(not contact request) even when the peer user is offline
-
-
-BRANCH SPECIFIC OBJECTIVES:
--(DONE)Change id type to ull
--(DONE)change elseifs to switch statements
--(DONE)Make register message function on daemon
--Make parsing message function on main app
--Make dynamic message length for daemon-daemon messages
