@@ -12,7 +12,7 @@
 const char* MULTICASTIP = "239.255.139.53";
 
 
-sockaddr_in* getOwnAddress(bool isReceiving){
+static inline sockaddr_in* getOwnAddress(bool isReceiving){
     sockaddr_in *fullAddress = new sockaddr_in;
     fullAddress->sin_addr.s_addr = htonl(INADDR_ANY);
     fullAddress->sin_family = AF_INET;
@@ -24,7 +24,7 @@ sockaddr_in* getOwnAddress(bool isReceiving){
 
 
 
-void bindSocket(int socket, bool isReceiving, bool isudp){
+static void bindSocket(int socket, bool isReceiving, bool isudp){
     sockaddr_in* fullAddress = getOwnAddress(isReceiving);
     if(!isReceiving && !isudp){
         int True = 1;
@@ -43,7 +43,7 @@ void bindSocket(int socket, bool isReceiving, bool isudp){
 
 
 
-pollfd newtcpSocket(bool isReceiving){
+static pollfd newtcpSocket(bool isReceiving){
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     handleError(sock);
 
@@ -83,7 +83,7 @@ void resetPeer(int sock){ // to allow socket to receive from all peer sockets
 
 
 
-void setMulticast(int socket){
+static inline void setMulticast(int socket){
     ip_mreqn *multicastAddress = new ip_mreqn;
     multicastAddress->imr_multiaddr.s_addr = inet_addr(MULTICASTIP);
     multicastAddress->imr_address.s_addr = htonl(INADDR_ANY);

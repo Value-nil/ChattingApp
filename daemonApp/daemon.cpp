@@ -37,26 +37,26 @@ using namespace std;
 
 
 
-void createNewId(){
+static inline void createNewId(){
     int success = getrandom(&deviceId, sizeof(deviceid_t), 0);
     handleError(success);
 
     deviceId = deviceId & (~USER_PART); //the upper half is used for the device id; the lower part is used for the user id
 }
 
-void createFifoDirectory(){
+static inline void createFifoDirectory(){
     int success = mkdir(FIFO_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     handleError(success);
     cout << "Created fifo directory on /tmp\n";
 }
 
-void checkIdDirectory(){
+static inline void checkIdDirectory(){
     int success = mkdir(ID_DIRECTORY_PATH, S_IRWXU);
     if(success == -1 && errno != EEXIST)
 	handleError(-1);
 }
 
-void checkForId(){
+static inline void checkForId(){
     checkIdDirectory();
     char* idPath = buildPath(ID_DIRECTORY_PATH, ID_PATH);
 
@@ -79,7 +79,7 @@ void checkForId(){
     delete[] idPath;
 }
 
-void createMsgDir(char* initialDirPath){
+static inline void createMsgDir(char* initialDirPath){
     char* messagesDirPath = buildPath(initialDirPath, MESSAGES_PATH);
 
     int messagesDirSuccess = mkdir(messagesDirPath, S_IRWXU);
@@ -91,7 +91,7 @@ void createMsgDir(char* initialDirPath){
 }
 
 
-char* createInitialDir(passwd* user){
+static inline char* createInitialDir(passwd* user){
     char* path = buildPath(user->pw_dir, INITIAL_DIR_PATH);
 
     int mkdirSuccess = mkdir(path, S_IRWXU);
@@ -102,7 +102,7 @@ char* createInitialDir(passwd* user){
     return path;
 }
 
-void setupUserDirectory(passwd* user){
+static inline void setupUserDirectory(passwd* user){
     seteuid(user->pw_uid);
 
     char* initialDirPath = createInitialDir(user);
@@ -117,12 +117,12 @@ void setupUserDirectory(passwd* user){
     delete[] initialDirPath;
 }
 
-void processUser(passwd* user){
+static inline void processUser(passwd* user){
     setupUserDirectory(user);
 }
 
 //as I need to retrieve the sending address, I need to translate it to use recvfrom() instead of read()
-void translateUdp(){
+static inline void translateUdp(){
     sockaddr_in* address = new sockaddr_in;
     socklen_t size = sizeof(sockaddr_in);
 
@@ -136,7 +136,7 @@ void translateUdp(){
     delete address;
 }
 
-void translateListeningTcp(){
+static inline void translateListeningTcp(){
     pollfd newConnection;
     int listeningTcpSocket = toRead[0].fd;    //first fd of polling vector is listening tcp
 
@@ -150,7 +150,7 @@ void translateListeningTcp(){
 }
 
 
-void checkUsers(){
+static inline void checkUsers(){
     passwd* user = getpwent();
     while(user != nullptr){
         if(user->pw_uid >= 1000 && user->pw_uid <= 59999){//checking for actually created users
@@ -169,7 +169,7 @@ void checkUsers(){
     }
 }
 
-void processNewData(int fd, size_t msgSize){
+static inline void processNewData(int fd, size_t msgSize){
     void* message = operator new(msgSize);
     size_t readBytes = read(fd, message, msgSize);
     cout << "The message intended size is " << msgSize << '\n';
@@ -187,7 +187,7 @@ void processNewData(int fd, size_t msgSize){
     operator delete(message);
 }
 
-void deleteAddress(int fd){
+static inline void deleteAddress(int fd){
     for(auto iter = remoteDevices.begin(); iter != remoteDevices.end(); iter++){
 	if((*iter).second == fd){
 	    remoteDevices.erase((*iter).first);
@@ -197,7 +197,7 @@ void deleteAddress(int fd){
 }
 
 
-void processNormalPolling(int index){
+static inline void processNormalPolling(int index){
     int fd = toRead[index].fd;
 
     size_t msgSize;
@@ -218,7 +218,7 @@ void processNormalPolling(int index){
 }
 
 
-void sendClosingMessage(int signal){
+static inline void sendClosingMessage(int signal){
     size_t sizeOfMsg = sizeof(short)*2+sizeof(deviceid_t);
 
     void* closingMessage = operator new(sizeof(size_t) + sizeOfMsg);
@@ -247,7 +247,7 @@ void sendClosingMessage(int signal){
     exit(EXIT_SUCCESS);
 }
 
-void connectTermSignal(){
+static inline void connectTermSignal(){
     struct sigaction* action = new struct sigaction;
     action->sa_handler = &sendClosingMessage;
     action->sa_flags = 0;

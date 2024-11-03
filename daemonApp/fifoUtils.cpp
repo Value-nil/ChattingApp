@@ -13,7 +13,7 @@
 extern pollVec toRead;
 
 
-const char* createFifo(deviceid_t id, bool isReading){
+static const char* createFifo(deviceid_t id, bool isReading){
     const char* fullFifoPath = getFifoPath(id, isReading);
     std::cout << "Creating fifo on: " << fullFifoPath << '\n';
 
@@ -41,7 +41,7 @@ void createUserFifos(uid_t userId){
     createFifo((deviceid_t)userId, false);
 }
 
-void removeUserFifos(uid_t id){
+static inline void removeUserFifos(uid_t id){
     const char* stringifiedId = stringifyId(id);
 
     const char* rFifoPath = getFifoPath(id, true);

@@ -57,7 +57,7 @@ void sendLocalContacts(int socket, deviceid_t idToSend){
 
 
 
-void connectToPeerListeningTcp(int fd, sockaddr_in* address){
+static inline void connectToPeerListeningTcp(int fd, sockaddr_in* address){
     address->sin_port = htons(LISTENING_PORT); // connect to the listening socket of the peer
 
     int success = connect(fd, (sockaddr*)address, sizeof(sockaddr_in));
@@ -66,7 +66,7 @@ void connectToPeerListeningTcp(int fd, sockaddr_in* address){
     address->sin_port = htons(SENDING_PORT); //revert port changes
 }
 
-void sendDeviceIdToPeer(int fd){
+static inline void sendDeviceIdToPeer(int fd){
     size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t);
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -84,7 +84,7 @@ void sendDeviceIdToPeer(int fd){
 }
 
 
-void makeNewDeviceConnection(deviceid_t peerDeviceId, sockaddr_in* address){
+static inline void makeNewDeviceConnection(deviceid_t peerDeviceId, sockaddr_in* address){
     //each device has its own socket, so a new socket is needed for every device(address)
     pollfd newtcp = newConnectingTcpSocket();
     connectToPeerListeningTcp(newtcp.fd, address);
