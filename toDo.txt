@@ -56,7 +56,7 @@ AFTER IT WORKS:
 -(DONE)Implementing messages and contacts saving
 
 -Add .desktop file
--Make all functions static and inline where applicable
+-(DONE)Make all functions static and inline where applicable
 -When processing input text, take into account newline insertions in locations that are different from end of string
 
 -Fix messages sometimes occupying all of the box space
