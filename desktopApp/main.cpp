@@ -148,7 +148,6 @@ static inline char* getFullText(GtkTextBuffer* buffer){
 
     char* text = gtk_text_buffer_get_text(buffer, start, end, false);
     char* toDelete = text;
-    text[strlen(text)-1] = '\0';
 
     char* temp = text;
     while(*temp == ' '){
@@ -204,12 +203,11 @@ static inline void displaySentMessage(deviceid_t peerId, const char* message){
 }
 
 void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
-    std::cout << "length: " << len << '\n';
-    if(text[0] == '\n'){
+    if(text[0] == '\n' && len == 1){
         char* fullText = getFullText(self);
         if(strcmp(fullText, "") && strlen(fullText) <= messageLimit){
-            gtk_text_buffer_set_text(self, "", 0);
-            
+	    gtk_text_buffer_set_text(self, "", 0);
+
 	    deviceid_t id = (deviceid_t)getuid();
             deviceid_t peerId = *(deviceid_t*)user_data;
 
@@ -218,12 +216,21 @@ void processCharacterInserted(GtkTextBuffer* self, const GtkTextIter* location, 
 	}
     }
 }
+void processTextAfterInserted(GtkTextBuffer* self, const GtkTextIter* location, gchar* text, gint len, gpointer user_data){
+    GtkTextIter* start = new GtkTextIter;
+    GtkTextIter* end = new GtkTextIter;
+    gtk_text_buffer_get_bounds(self, start, end);
 
+    char* bufferText = gtk_text_buffer_get_text(self, start, end, false);
+    if(bufferText[0] == '\n' && strlen(bufferText) == 1)
+	gtk_text_buffer_set_text(self, "", 0);
+}
 
 static inline void setupInsertTextCallback(GtkTextBuffer* inputTextBuffer, deviceid_t peerId){
     deviceid_t* peerIdAlloc = new deviceid_t;
     *peerIdAlloc = peerId;
-    g_signal_connect_after(inputTextBuffer, "insert-text", (GCallback)processCharacterInserted, peerIdAlloc);
+    g_signal_connect(inputTextBuffer, "insert-text", (GCallback)processCharacterInserted, peerIdAlloc);
+    g_signal_connect_after(inputTextBuffer, "insert-text", (GCallback)processTextAfterInserted, NULL);
 }
 
 static void displayIncomingMessage(deviceid_t peerId, const char* actualMessage){
