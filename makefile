@@ -91,3 +91,5 @@ uninstall:
 .PHONY = clean
 clean:
 	-rm *.o
+	-rm chattingApp
+	-rm chattingappd
