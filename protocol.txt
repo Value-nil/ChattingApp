@@ -17,3 +17,6 @@ Daemon to daemon tcp:
 4: contact leaving
 5: device sending ID
 6: remote ID has opened and is requesting local contacts
+7: start syncronization for a certain id
+8: check the following message
+9: remote peer has ended its file

@@ -63,3 +63,11 @@ AFTER IT WORKS:
 -Make a syncronization mechanism to allow sending message(not contact request) even when the peer user is offline(NEW BRANCH)
 -Tell FIFO about new contacts that are requesting(not a priority)
     --Handle someone requesting your contact(send notification)
+
+BRANCH SPECIFIC:
+-(DONE)update protocol entries
+-Make function to start sync on accepted contacts
+-Make sync message function
+-Make end sync function
+-Adapt desktop app to sync mechanism
+-Test everything
