@@ -16,11 +16,13 @@
 #include <iostream>
 #include <fcntl.h>
 #include <time.h>
+#include <dirent.h>
 
 extern idToFd localUsers;
 extern idVec requestedPeers;
 extern idToFd remoteDevices;
 extern deviceid_t deviceId;
+extern idToFd syncFds;
 
 
 
@@ -340,6 +342,8 @@ static inline void sendNewContactToLocals(deviceid_t peerId){
     }
 }
 
+
+
 static inline void addNewRemoteContact(void* message){
     deviceid_t userThatWasRequesting = *(deviceid_t*)message;
     message = (deviceid_t*)message + 1;
@@ -378,15 +382,83 @@ static inline void removeRemoteContact(void* message){
     operator delete(toSend);
 }
 
+static void openMessageFileForSync(deviceid_t localId, deviceid_t peerId){//both ids given in full format
+    const char* messageFilePath = getMessageFilePath((localId & USER_PART), peerId);
+
+    int fd = open(messageFilePath, O_RDWR);
+    handleError(fd);
+
+    delete[] messageFilePath;
+
+    deviceid_t idXor = localId^peerId;
+    syncFds[idXor] = fd;
+    std::cout << "Sync starting for local id " << localId << " and peer id " << peerId << '\n';
+}
+
+static inline void sendSyncronizationStartMessage(deviceid_t peerDeviceId){
+    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t)*2;
+    int fd = remoteDevices[peerDeviceId];
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
+    void* toSend = message;
+
+    *(size_t*)message = sizeOfMsg;
+    message = (size_t*)message + 1;
+    *(short*)message = 1;
+    message = (short*)message + 1;
+    *(short*)message = 7;
+    message = (short*)message + 1;
+
+    for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
+	deviceid_t id = (*iter).first;
+	*(deviceid_t*)message = id | deviceId;
+	message = (deviceid_t*)message + 1;
+
+	const char* messageDirPath = getMessageDirectoryPath(id);
+	DIR* dirptr = opendir(messageDirPath);
+	struct dirent* direcEnt = readdir(dirptr);
+
+	delete[] messageDirPath;
+
+	while(direcEnt != nullptr){
+	    deviceid_t peerId = unstringifyId(direcEnt->d_name);
+
+	    if((peerId & ~USER_PART) == peerDeviceId){
+		*(deviceid_t*)message = peerId;
+		int success2 = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
+		handleError(success2);
+
+		openMessageFileForSync(id | deviceId, peerId);
+		//here would go the function to send the first message for sync
+	    }
+	    direcEnt = readdir(dirptr);
+	}
+	int success3 = closedir(dirptr);
+	handleError(success3);
+
+	message = (deviceid_t*)message - 1;
+    }
+    operator delete(toSend);
+}
+
 static inline void addRemoteDevice(void* message, int fd){
     deviceid_t remoteId = *(deviceid_t*)message;
     remoteDevices[remoteId] = fd;
     sendLocalContacts(fd, 0); //0 to represent sending for all remote peers
+    sendSyncronizationStartMessage(remoteId);
 }
 
 static inline void sendLocalContactsToSpecificId(void* message, int fd){
     deviceid_t peerId = *(deviceid_t*)message;
     sendLocalContacts(fd, peerId);
+}
+
+static inline void processSyncStartRequest(void* message){
+    deviceid_t peerId = *(deviceid_t*)message;
+    message = (deviceid_t*)message + 1;
+    deviceid_t localId = *(deviceid_t*)message;
+
+    openMessageFileForSync(localId, peerId);
 }
 
 
@@ -403,6 +475,7 @@ void processTcp(void* message, int fd){
 	case 4: removeRemoteContact(message); break; //remote contact is leaving
 	case 5: addRemoteDevice(message, fd); break; //remote device is sending its device id
 	case 6: sendLocalContactsToSpecificId(message, fd); break; //remote contact has opened and is requesting device
+	case 7: processSyncStartRequest(message); //remote device is requesting sync
     }
 
 }

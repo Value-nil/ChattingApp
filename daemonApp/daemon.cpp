@@ -31,6 +31,7 @@ idVec requestedPeers;//indicates peers that requested contacting with another pe
 idToFd localUsers; //local user id to fifo fd
 idToFd remoteDevices; //remote device id to writeable socket fd
 deviceid_t deviceId;//an id unique for each device
+idToFd syncFds; //xor of both full ids to fd of messages file
 
 
 using namespace std;

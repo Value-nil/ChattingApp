@@ -66,7 +66,7 @@ AFTER IT WORKS:
 
 BRANCH SPECIFIC:
 -(DONE)update protocol entries
--Make function to start sync on accepted contacts
+-(DONE)Make function to start sync on accepted contacts
 -Make sync message function
 -Make end sync function
 -Adapt desktop app to sync mechanism
