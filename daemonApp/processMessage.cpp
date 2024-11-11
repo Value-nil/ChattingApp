@@ -395,6 +395,77 @@ static void openMessageFileForSync(deviceid_t localId, deviceid_t peerId){//both
     std::cout << "Sync starting for local id " << localId << " and peer id " << peerId << '\n';
 }
 
+static void* readRegisteredMessage(deviceid_t xorIds){
+    int fileFd = syncFds[xorIds];
+
+    void* metadata = operator new(metadataSize);
+    void* toDelete = metadata;
+
+    int success = read(fileFd, metadata, metadataSize);
+    handleError(success);
+    if(success == 0) return nullptr;
+
+    metadata += sizeof(bool) + sizeof(time_t);
+    int sizeOfActualMessage = *(int*)metadata;
+    metadata = toDelete;
+
+    char* actualMessage = new char[sizeOfActualMessage];
+    int success2 = read(fileFd, actualMessage, sizeOfActualMessage);
+    handleError(success2);
+
+    void* fullRegister = operator new(metadataSize + sizeof(char)*sizeOfActualMessage);
+    memcpy(fullRegister, metadata, metadataSize);
+    fullRegister += metadataSize;
+    strncpy((char*)fullRegister, actualMessage, sizeOfActualMessage);
+
+    operator delete(toDelete);
+    delete[] actualMessage;
+
+    return fullRegister;
+}
+static void sendEndSyncMessage(deviceid_t localId, deviceid_t peerId){
+    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t)*2;
+    int fd = remoteDevices[peerId & ~USER_PART];
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
+    void* toSend = message;
+
+    *(size_t*)message = sizeOfMsg;
+    message += sizeof(size_t);
+    *(short*)message = 1;
+    message += sizeof(short);
+    *(short*)message = 9;
+    message += sizeof(short);
+    *(deviceid_t*)message = localId;
+    message += sizeof(deviceid_t);
+    *(deviceid_t*)message = peerId;
+
+    int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
+    handleError(success);
+}
+
+static void sendSyncMessage(void* payload, deviceid_t localId, deviceid_t peerId){
+    int sizeOfActualMessage = *(int*)(payload + sizeof(bool) + sizeof(time_t));
+    size_t sizeOfMsg = sizeof(short)*2 + metadataSize + sizeof(deviceid_t) + sizeOfActualMessage*sizeof(char);
+    int fd = remoteDevices[peerId & ~USER_PART];
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
+    void* toSend = message;
+
+    *(size_t*)message = sizeOfMsg;
+    message += sizeof(size_t);
+    *(short*)message = 1;
+    message += sizeof(short);
+    *(short*)message = 8;
+    message += sizeof(short);
+    *(deviceid_t*)message = localId^peerId;
+    message += sizeof(deviceid_t);
+    memcpy(message, payload, metadataSize + sizeOfActualMessage);
+    
+    int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
+    handleError(success);
+}
+
 static inline void sendSyncronizationStartMessage(deviceid_t peerDeviceId){
     size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t)*2;
     int fd = remoteDevices[peerDeviceId];
@@ -411,7 +482,9 @@ static inline void sendSyncronizationStartMessage(deviceid_t peerDeviceId){
 
     for(auto iter = localUsers.begin(); iter != localUsers.end(); iter++){
 	deviceid_t id = (*iter).first;
-	*(deviceid_t*)message = id | deviceId;
+	deviceid_t fullId = id | deviceId;
+
+	*(deviceid_t*)message = fullId;
 	message = (deviceid_t*)message + 1;
 
 	const char* messageDirPath = getMessageDirectoryPath(id);
@@ -428,8 +501,13 @@ static inline void sendSyncronizationStartMessage(deviceid_t peerDeviceId){
 		int success2 = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
 		handleError(success2);
 
-		openMessageFileForSync(id | deviceId, peerId);
-		//here would go the function to send the first message for sync
+		openMessageFileForSync(fullId, peerId);
+		void* firstMessage = readRegisteredMessage(fullId^peerId);
+		if(firstMessage != nullptr)
+		    sendSyncMessage(firstMessage, fullId, peerId);
+		else
+		    sendEndSyncMessage(fullId, peerId);
+
 	    }
 	    direcEnt = readdir(dirptr);
 	}
@@ -460,6 +538,8 @@ static inline void processSyncStartRequest(void* message){
 
     openMessageFileForSync(localId, peerId);
 }
+
+
 
 
 //keep in mind IDs are reversed!
