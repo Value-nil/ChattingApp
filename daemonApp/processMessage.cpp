@@ -22,7 +22,9 @@ extern idToFd localUsers;
 extern idVec requestedPeers;
 extern idToFd remoteDevices;
 extern deviceid_t deviceId;
-extern idToFd syncFds;
+idToFd syncFds;
+idToSyncBuffer syncBuffers;
+
 
 
 
@@ -539,7 +541,30 @@ static inline void processSyncStartRequest(void* message){
     openMessageFileForSync(localId, peerId);
 }
 
+static void writeToTempFile(void* message, deviceid_t xorIds){
+    message += sizeof(bool) + sizeof(time_t);
+    int sizeOfActualMessage = *(int*)message;
+    message -= sizeof(bool) + sizeof(time_t);
 
+    void* record = operator new(metadataSize + sizeof(char)*sizeOfActualMessage);
+    memcpy(record, message, metadataSize + sizeof(char)*sizeOfActualMessage);
+
+    syncBuffers[xorIds].push_back(record);
+}
+
+static inline void processSyncRequest(void* message, int fd){
+    deviceid_t xorIds = *(deviceid_t*)message;
+    int fileFd = syncFds[xorIds];
+
+    message += sizeof(deviceid_t);
+    *(bool*)message = !(*(bool*)message);//locally sent variable depends on the device; since it's being sent by a peer, it must be negated
+
+    int currentOffset = lseek(fileFd, 0, SEEK_CUR);
+    handleError(currentOffset);
+
+    void* currentRecord = readRegisteredMessage(xorIds);
+
+}
 
 
 //keep in mind IDs are reversed!

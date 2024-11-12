@@ -15,6 +15,7 @@ typedef std::map<deviceid_t, int> idToFd;
 typedef std::vector<deviceid_t> idVec;
 typedef std::vector<pollfd> pollVec;
 typedef std::map<in_addr, int> addrToFd;
+typedef std::map<deviceid_t, std::vector<void*>> idToSyncBuffer;
 
 
 
