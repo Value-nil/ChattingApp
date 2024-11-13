@@ -446,10 +446,9 @@ static void sendEndSyncMessage(deviceid_t localId, deviceid_t peerId){
     handleError(success);
 }
 
-static void sendSyncMessage(void* payload, deviceid_t localId, deviceid_t peerId){
+static void sendSyncMessage(void* payload, deviceid_t xorIds, int fd){
     int sizeOfActualMessage = *(int*)(payload + sizeof(bool) + sizeof(time_t));
     size_t sizeOfMsg = sizeof(short)*2 + metadataSize + sizeof(deviceid_t) + sizeOfActualMessage*sizeof(char);
-    int fd = remoteDevices[peerId & ~USER_PART];
 
     void* message = operator new(sizeof(size_t) + sizeOfMsg);
     void* toSend = message;
@@ -460,7 +459,7 @@ static void sendSyncMessage(void* payload, deviceid_t localId, deviceid_t peerId
     message += sizeof(short);
     *(short*)message = 8;
     message += sizeof(short);
-    *(deviceid_t*)message = localId^peerId;
+    *(deviceid_t*)message = xorIds;
     message += sizeof(deviceid_t);
     memcpy(message, payload, metadataSize + sizeOfActualMessage);
     
@@ -506,7 +505,7 @@ static inline void sendSyncronizationStartMessage(deviceid_t peerDeviceId){
 		openMessageFileForSync(fullId, peerId);
 		void* firstMessage = readRegisteredMessage(fullId^peerId);
 		if(firstMessage != nullptr)
-		    sendSyncMessage(firstMessage, fullId, peerId);
+		    sendSyncMessage(firstMessage, fullId | peerId, remoteDevices[peerId & ~USER_PART]);
 		else
 		    sendEndSyncMessage(fullId, peerId);
 
@@ -552,6 +551,45 @@ static void writeToTempFile(void* message, deviceid_t xorIds){
     syncBuffers[xorIds].push_back(record);
 }
 
+static void writeOlderMessage(void* message, deviceid_t xorIds, int currentOffset){
+    writeToTempFile(message, xorIds);
+    int success = lseek(syncFds[xorIds], currentOffset, SEEK_SET);
+    handleError(success);
+}
+
+static short compareMessages(void* localRecord, void* remoteRecord){
+    bool localSentM1 = *(bool*)remoteRecord;
+    remoteRecord += sizeof(bool);
+    time_t timeSentM1 = *(time_t*)remoteRecord;
+
+    bool localSentM2 = *(bool*)localRecord;
+    localRecord += sizeof(bool);
+    time_t timeSentM2 = *(time_t*)localRecord;
+
+    long long difference = timeSentM1 - timeSentM2;
+    if(difference > 0)//remote record time is higher than local
+	return 1;
+    else if(difference < 0)//remote record time is lower than local
+	return -1;
+    else return 0;
+}
+static void processEqualMessage(deviceid_t xorIds, void* currentRecord, int fd){
+    writeToTempFile(currentRecord, xorIds);
+    operator delete(currentRecord);
+
+    int currentOffset = lseek(fileFd, 0, SEEK_CUR);
+    handleError(currentOffset);
+
+    currentRecord = readRegisteredMessage(xorIds);
+    sendSyncMessage(currentRecord, xorIds, fd);
+
+    int success = lseek(syncFds[xorIds], currentOffset, SEEK_SET);
+    handleError(success);
+
+    operator delete(currentRecord);
+}
+
+
 static inline void processSyncRequest(void* message, int fd){
     deviceid_t xorIds = *(deviceid_t*)message;
     int fileFd = syncFds[xorIds];
@@ -563,7 +601,33 @@ static inline void processSyncRequest(void* message, int fd){
     handleError(currentOffset);
 
     void* currentRecord = readRegisteredMessage(xorIds);
+    short difference = compareMessages(currentRecord, message);
+ 
+    if(difference == -1){
+	writeOlderMessage(message, xorIds, currentOffset);
+	operator delete(currentRecord);
+    }
+    else if(difference == 1){
+	while(difference == 1){
+	    writeToTempFile(currentRecord, xorIds);
+	    sendSyncMessage(currentRecord, xorIds, fd);
+	    operator delete(currentRecord);
 
+	    int currentOffset = lseek(fileFd, 0, SEEK_CUR);
+	    handleError(currentOffset);
+
+	    currentRecord = readRegisteredMessage(xorIds);
+	    difference = compareMessages(currentRecord, message);
+	}
+	if(difference == -1){
+	    writeOlderMessage(message, xorIds, currentOffset);
+	    operator delete(currentRecord);
+	}
+	else
+	    processEqualMessage(xorIds, currentRecord, fd);
+    }
+    else
+	processEqualMessage(xorIds, currentRecord, fd);
 }
 
 
@@ -580,7 +644,8 @@ void processTcp(void* message, int fd){
 	case 4: removeRemoteContact(message); break; //remote contact is leaving
 	case 5: addRemoteDevice(message, fd); break; //remote device is sending its device id
 	case 6: sendLocalContactsToSpecificId(message, fd); break; //remote contact has opened and is requesting device
-	case 7: processSyncStartRequest(message); //remote device is requesting sync
+	case 7: processSyncStartRequest(message); break; //remote device is requesting sync
+	case 8: processSyncRequest(message, fd); break; // remote device is sending message for sync
     }
 
 }
