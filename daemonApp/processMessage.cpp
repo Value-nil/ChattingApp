@@ -551,12 +551,6 @@ static void writeToTempFile(void* message, deviceid_t xorIds){
     syncBuffers[xorIds].push_back(record);
 }
 
-static void writeOlderMessage(void* message, deviceid_t xorIds, int currentOffset){
-    writeToTempFile(message, xorIds);
-    int success = lseek(syncFds[xorIds], currentOffset, SEEK_SET);
-    handleError(success);
-}
-
 static short compareMessages(void* localRecord, void* remoteRecord){
     bool localSentM1 = *(bool*)remoteRecord;
     remoteRecord += sizeof(bool);
@@ -573,6 +567,7 @@ static short compareMessages(void* localRecord, void* remoteRecord){
 	return -1;
     else return 0;
 }
+
 static void processEqualMessage(deviceid_t xorIds, void* currentRecord, int fd){
     writeToTempFile(currentRecord, xorIds);
     operator delete(currentRecord);
@@ -589,6 +584,36 @@ static void processEqualMessage(deviceid_t xorIds, void* currentRecord, int fd){
     operator delete(currentRecord);
 }
 
+static void processNewerMessage(deviceid_t xorIds, void* message, void* currentRecord, int currentOffset){
+    writeToTempFile(message, xorIds);
+    int success = lseek(syncFds[xorIds], currentOffset, SEEK_SET);
+    handleError(success);
+
+    operator delete(currentRecord);
+}
+
+static inline void processOlderMessage(deviceid_t xorIds, int difference, void* currentRecord, void* message, int fd){
+    int currentOffset;
+
+    while(difference == 1){
+	writeToTempFile(currentRecord, xorIds);
+	sendSyncMessage(currentRecord, xorIds, fd);
+	operator delete(currentRecord);
+	
+	currentOffset = lseek(syncFds[xorIds], 0, SEEK_CUR);
+	handleError(currentOffset);
+
+	currentRecord = readRegisteredMessage(xorIds);
+	difference = compareMessages(currentRecord, message);
+    }
+
+
+    if(difference == -1){
+	processNewerMessage(xorIds, message, currentRecord, currentOffset);
+    }
+    else
+	processEqualMessage(xorIds, currentRecord, fd);
+}
 
 static inline void processSyncRequest(void* message, int fd){
     deviceid_t xorIds = *(deviceid_t*)message;
@@ -605,27 +630,10 @@ static inline void processSyncRequest(void* message, int fd){
 
     switch(difference){
 	case -1:
-	    writeOlderMessage(message, xorIds, currentOffset);
-	    operator delete(currentRecord);
+	    processNewerMessage(xorIds, message, currentRecord, currentOffset);
 	    break;
 	case 1:
-	    while(difference == 1){
-		writeToTempFile(currentRecord, xorIds);
-		sendSyncMessage(currentRecord, xorIds, fd);
-		operator delete(currentRecord);
-
-		int currentOffset = lseek(fileFd, 0, SEEK_CUR);
-		handleError(currentOffset);
-
-		currentRecord = readRegisteredMessage(xorIds);
-		difference = compareMessages(currentRecord, message);
-	    }
-	    if(difference == -1){
-		writeOlderMessage(message, xorIds, currentOffset);
-		operator delete(currentRecord);
-	    }
-	    else
-		processEqualMessage(xorIds, currentRecord, fd);
+	    processOlderMessage(xorIds, difference, currentRecord, message, fd);
 	    break;
 	default:
 	    processEqualMessage(xorIds, currentRecord, fd);
