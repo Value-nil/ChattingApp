@@ -504,8 +504,10 @@ static inline void sendSyncronizationStartMessage(deviceid_t peerDeviceId){
 
 		openMessageFileForSync(fullId, peerId);
 		void* firstMessage = readRegisteredMessage(fullId^peerId);
-		if(firstMessage != nullptr)
+		if(firstMessage != nullptr){
 		    sendSyncMessage(firstMessage, fullId | peerId, remoteDevices[peerId & ~USER_PART]);
+		    syncBuffers[fullId | peerId].push_back(nullptr);
+		}
 		else
 		    sendEndSyncMessage(fullId, peerId);
 
@@ -569,6 +571,9 @@ static short compareMessages(void* localRecord, void* remoteRecord){
 }
 
 static void processEqualMessage(deviceid_t xorIds, void* currentRecord, int fd){
+    if(syncBuffers[xorIds][0] == nullptr)
+	syncBuffers[xorIds].erase(syncBuffers[xorIds].begin());
+
     writeToTempFile(currentRecord, xorIds);
     operator delete(currentRecord);
 
@@ -584,7 +589,12 @@ static void processEqualMessage(deviceid_t xorIds, void* currentRecord, int fd){
     operator delete(currentRecord);
 }
 
-static void processNewerMessage(deviceid_t xorIds, void* message, void* currentRecord, int currentOffset){
+static void processNewerMessage(deviceid_t xorIds, void* message, void* currentRecord, int currentOffset, int fd){
+    if(syncBuffers[xorIds].size() == 0)
+	sendSyncMessage(currentRecord, xorIds, fd);
+    if(syncBuffers[xorIds][0] == nullptr)
+	syncBuffers[xorIds].erase(syncBuffers[xorIds].begin());
+
     writeToTempFile(message, xorIds);
     int success = lseek(syncFds[xorIds], currentOffset, SEEK_SET);
     handleError(success);
@@ -594,6 +604,8 @@ static void processNewerMessage(deviceid_t xorIds, void* message, void* currentR
 
 static inline void processOlderMessage(deviceid_t xorIds, int difference, void* currentRecord, void* message, int fd){
     int currentOffset;
+    if(syncBuffers[xorIds][0] == nullptr)
+	syncBuffers[xorIds].erase(syncBuffers[xorIds].begin());
 
     while(difference == 1){
 	writeToTempFile(currentRecord, xorIds);
@@ -607,9 +619,9 @@ static inline void processOlderMessage(deviceid_t xorIds, int difference, void* 
 	difference = compareMessages(currentRecord, message);
     }
 
-
     if(difference == -1){
-	processNewerMessage(xorIds, message, currentRecord, currentOffset);
+	processNewerMessage(xorIds, message, currentRecord, currentOffset, fd);
+	sendSyncMessage(currentRecord, xorIds, fd);
     }
     else
 	processEqualMessage(xorIds, currentRecord, fd);
@@ -630,7 +642,7 @@ static inline void processSyncRequest(void* message, int fd){
 
     switch(difference){
 	case -1:
-	    processNewerMessage(xorIds, message, currentRecord, currentOffset);
+	    processNewerMessage(xorIds, message, currentRecord, currentOffset, fd);
 	    break;
 	case 1:
 	    processOlderMessage(xorIds, difference, currentRecord, message, fd);
