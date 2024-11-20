@@ -397,15 +397,46 @@ static void openMessageFileForSync(deviceid_t localId, deviceid_t peerId){//both
     std::cout << "Sync starting for local id " << localId << " and peer id " << peerId << '\n';
 }
 
-static void* readRegisteredMessage(deviceid_t xorIds){
+static void sendEndSyncMessage(deviceid_t xorIds, int fd){
+    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t);
+
+    void* message = operator new(sizeof(size_t) + sizeOfMsg);
+    void* toSend = message;
+
+    *(size_t*)message = sizeOfMsg;
+    message += sizeof(size_t);
+    *(short*)message = 1;
+    message += sizeof(short);
+    *(short*)message = 9;
+    message += sizeof(short);
+    *(deviceid_t*)message = xorIds;
+
+    int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
+    handleError(success);
+
+    operator delete(toSend);
+}
+
+static inline void handleEndOfFile(deviceid_t xorIds, int fd){
+    if(syncFds[xorIds] != 0)
+	sendEndSyncMessage(xorIds, fd);
+    close(syncFds[xorIds]);
+    syncFds[xorIds] = 0;
+}
+
+static void* readRegisteredMessage(deviceid_t xorIds, int fd){
     int fileFd = syncFds[xorIds];
+    if(fileFd == 0) return nullptr;
 
     void* metadata = operator new(metadataSize);
     void* toDelete = metadata;
 
     int success = read(fileFd, metadata, metadataSize);
     handleError(success);
-    if(success == 0) return nullptr;
+    if(success == 0){
+	handleEndOfFile(xorIds, fd);
+	return nullptr;
+    }
 
     metadata += sizeof(bool) + sizeof(time_t);
     int sizeOfActualMessage = *(int*)metadata;
@@ -425,26 +456,7 @@ static void* readRegisteredMessage(deviceid_t xorIds){
 
     return fullRegister;
 }
-static void sendEndSyncMessage(deviceid_t localId, deviceid_t peerId){
-    size_t sizeOfMsg = sizeof(short)*2 + sizeof(deviceid_t)*2;
-    int fd = remoteDevices[peerId & ~USER_PART];
 
-    void* message = operator new(sizeof(size_t) + sizeOfMsg);
-    void* toSend = message;
-
-    *(size_t*)message = sizeOfMsg;
-    message += sizeof(size_t);
-    *(short*)message = 1;
-    message += sizeof(short);
-    *(short*)message = 9;
-    message += sizeof(short);
-    *(deviceid_t*)message = localId;
-    message += sizeof(deviceid_t);
-    *(deviceid_t*)message = peerId;
-
-    int success = write(fd, toSend, sizeof(size_t) + sizeOfMsg);
-    handleError(success);
-}
 
 static void sendSyncMessage(void* payload, deviceid_t xorIds, int fd){
     int sizeOfActualMessage = *(int*)(payload + sizeof(bool) + sizeof(time_t));
@@ -503,14 +515,13 @@ static inline void sendSyncronizationStartMessage(deviceid_t peerDeviceId){
 		handleError(success2);
 
 		openMessageFileForSync(fullId, peerId);
-		void* firstMessage = readRegisteredMessage(fullId^peerId);
+		int fd = remoteDevices[peerId & ~USER_PART];
+		void* firstMessage = readRegisteredMessage(fullId^peerId, fd);
+
 		if(firstMessage != nullptr){
-		    sendSyncMessage(firstMessage, fullId | peerId, remoteDevices[peerId & ~USER_PART]);
+		    sendSyncMessage(firstMessage, fullId | peerId, fd);
 		    syncBuffers[fullId | peerId].push_back(nullptr);
 		}
-		else
-		    sendEndSyncMessage(fullId, peerId);
-
 	    }
 	    direcEnt = readdir(dirptr);
 	}
@@ -554,6 +565,8 @@ static void writeToTempFile(void* message, deviceid_t xorIds){
 }
 
 static short compareMessages(void* localRecord, void* remoteRecord){
+    if(localRecord == nullptr) return -1;
+
     bool localSentM1 = *(bool*)remoteRecord;
     remoteRecord += sizeof(bool);
     time_t timeSentM1 = *(time_t*)remoteRecord;
@@ -580,8 +593,9 @@ static void processEqualMessage(deviceid_t xorIds, void* currentRecord, int fd){
     int currentOffset = lseek(syncFds[xorIds], 0, SEEK_CUR);
     handleError(currentOffset);
 
-    currentRecord = readRegisteredMessage(xorIds);
-    sendSyncMessage(currentRecord, xorIds, fd);
+    currentRecord = readRegisteredMessage(xorIds, fd);
+    if(currentRecord != nullptr)
+	sendSyncMessage(currentRecord, xorIds, fd);
 
     int success = lseek(syncFds[xorIds], currentOffset, SEEK_SET);
     handleError(success);
@@ -590,7 +604,7 @@ static void processEqualMessage(deviceid_t xorIds, void* currentRecord, int fd){
 }
 
 static void processNewerMessage(deviceid_t xorIds, void* message, void* currentRecord, int currentOffset, int fd){
-    if(syncBuffers[xorIds].size() == 0)
+    if(syncBuffers[xorIds].size() == 0 && currentRecord != nullptr)
 	sendSyncMessage(currentRecord, xorIds, fd);
     if(syncBuffers[xorIds][0] == nullptr)
 	syncBuffers[xorIds].erase(syncBuffers[xorIds].begin());
@@ -615,7 +629,7 @@ static inline void processOlderMessage(deviceid_t xorIds, int difference, void* 
 	currentOffset = lseek(syncFds[xorIds], 0, SEEK_CUR);
 	handleError(currentOffset);
 
-	currentRecord = readRegisteredMessage(xorIds);
+	currentRecord = readRegisteredMessage(xorIds, fd);
 	difference = compareMessages(currentRecord, message);
     }
 
@@ -637,7 +651,7 @@ static inline void processSyncRequest(void* message, int fd){
     int currentOffset = lseek(fileFd, 0, SEEK_CUR);
     handleError(currentOffset);
 
-    void* currentRecord = readRegisteredMessage(xorIds);
+    void* currentRecord = readRegisteredMessage(xorIds, fd);
     short difference = compareMessages(currentRecord, message);
 
     switch(difference){
