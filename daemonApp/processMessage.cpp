@@ -418,15 +418,15 @@ static void sendEndSyncMessage(deviceid_t xorIds, int fd){
 }
 
 static inline void handleEndOfFile(deviceid_t xorIds, int fd){
-    if(syncFds[xorIds] != 0)
+    if(syncFds[xorIds] > 0){
 	sendEndSyncMessage(xorIds, fd);
-    close(syncFds[xorIds]);
-    syncFds[xorIds] = 0;
+	syncFds[xorIds] = -syncFds[xorIds];
+    }
 }
 
 static void* readRegisteredMessage(deviceid_t xorIds, int fd){
     int fileFd = syncFds[xorIds];
-    if(fileFd == 0) return nullptr;
+    if(fileFd < 0) return nullptr;
 
     void* metadata = operator new(metadataSize);
     void* toDelete = metadata;
@@ -666,6 +666,44 @@ static inline void processSyncRequest(void* message, int fd){
     }
 }
 
+static inline void writeToPermanentFile(int fileFd, void* message){
+    void* toWrite = message;
+    message += sizeof(bool) + sizeof(time_t);
+    int actualMessageSize = *(int*)message;
+
+    int success = write(fileFd, toWrite, metadataSize + sizeof(char)*actualMessageSize);
+    handleError(success);
+}
+
+static inline void commitSyncChanges(deviceid_t xorIds){
+    int fileFd = syncFds[xorIds] > 0 ? syncFds[xorIds] : -syncFds[xorIds];
+    std::vector<void*> buffer = syncBuffers[xorIds];
+
+    int success = lseek(fileFd, 0, SEEK_SET);
+    handleError(success);
+    
+    for(unsigned int i = 0; i < buffer.size(); i++){
+	writeToPermanentFile(fileFd, buffer[i]);
+	operator delete(buffer[i]);
+    }
+
+    syncBuffers.erase(xorIds);
+    close(syncFds[xorIds]);
+    syncFds.erase(xorIds);
+}
+
+
+static inline void processEndSyncRequest(void* message, int fd){
+    deviceid_t xorIds = *(deviceid_t*)message;
+    void* localRegister = readRegisteredMessage(xorIds, fd);
+    while(localRegister != nullptr){
+	sendSyncMessage(localRegister, xorIds, fd);
+	writeToTempFile(localRegister, xorIds);
+	localRegister = readRegisteredMessage(xorIds, fd);
+    }
+    commitSyncChanges(xorIds);
+}
+
 
 //keep in mind IDs are reversed!
 void processTcp(void* message, int fd){
@@ -682,6 +720,7 @@ void processTcp(void* message, int fd){
 	case 6: sendLocalContactsToSpecificId(message, fd); break; //remote contact has opened and is requesting device
 	case 7: processSyncStartRequest(message); break; //remote device is requesting sync
 	case 8: processSyncRequest(message, fd); break; // remote device is sending message for sync
+	case 9: processEndSyncRequest(message, fd); break; // remote device is ending sync
     }
 
 }
